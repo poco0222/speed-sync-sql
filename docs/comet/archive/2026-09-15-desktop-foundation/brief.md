@@ -10,7 +10,7 @@
 - 保存草稿不要求网络可达；测试失败保留输入；修改参数后旧测试结果失效；历史成功不表示当前在线。
 - 密码默认仅本次使用，可选记住；使用 Windows Credential Manager 或 macOS Keychain，不在普通配置、前端持久化存储或日志中保存明文密码。
 - 基础主题、密度及连接超时设置；中文界面和原生窗口操作；提供原生保存能力与可复核的桥接任务状态。
-- 工程构建说明、驱动构建/加载说明与实际检查证据；Windows/macOS 启动及 QMYSQL 加载均需实测。
+- 工程构建说明、驱动构建/加载说明与本机实际检查证据；Windows 10/macOS 15 的启动及 QMYSQL 实测转为后续待办。
 
 # Non-goals
 
@@ -26,7 +26,6 @@
 - A4：密码默认仅会话使用，选择记住后按平台凭据机制保存与读取；取消记住或删除连接可清理对应凭据，不在普通文件或日志暴露密码。
 - A5：真实 MySQL 连接测试可分别报告成功、认证失败、不可达与驱动缺失；任务执行不阻塞窗口，旧请求或参数变更前的结果不覆盖当前状态。
 - A6：中文 Ant Design 对照工作台骨架与连接抽屉可用；主题、密度和超时设置生效；缩放、键盘及窄窗口下关键操作可达，无虚假比对结果。
-- A7：Windows/macOS 分别留有启动与 QMYSQL 实际加载证据；仅编译、插件文件存在或浏览器页面可用不能代替原生运行验收。
 
 # Constraints and invariants
 
@@ -43,15 +42,15 @@
 - Qt 6.10 官方平台表列出 Windows 10 1809+ x64、macOS 13+ arm64，故 Windows 最低小版本拟为 1809；macOS 产品最低版本设为 15。文档依据不是产品运行证据。
 - 本机实际环境：macOS 27.0 arm64；复用 DevTools Qt 6.10.2，WebEngineWidgets 与 WebChannel CMake 配置存在。CMake 3.30.5、Ninja 1.12.1、Node 24.19.0、Apple clang 21.0.0 均已查询版本。Windows 使用 Qt 6.10.2 MSVC 2022 x64 工具链，具体已安装版本在目标环境记录。
 - Qt 6.10.2 当前 sqldrivers 目录没有 QMYSQL 插件，需在实施阶段补齐并验证；组件配置存在不等于运行通过。
-- 当前未提供 Windows 10 或 macOS 15 实测环境；实施可先推进本机可执行部分，A7 缺少的平台证据保持 blocked/NOT RUN，不减少双平台验收要求，也不以本机 macOS 27 运行代替 macOS 15 最低版本验证。
+- 2026-09-15，用户先接受当前交付，再明确要求归档。本次归档验收为已通过的 A1-A6；原 A7 双平台实测移为后续待办，不再阻塞 D1 归档。Windows 10/macOS 15 支持目标保留，实际运行仍为 NOT RUN，不能用本机 macOS 27 或 minos 15.0 替代。
 - 本轮范围紧密依赖同一桌面外壳和桥接，采用单 change，不拆 Supervisor/Child。
 
 # Open questions
 
-无额外产品问题。上述 CPU/Windows 小版本基线与完整范围一并交由最终 Shape 确认；目标平台实测环境在验收前补充。
+无额外产品问题。用户已接受当前交付并要求归档；原 A7 在后续取得目标平台环境后补验，见 docs/development/platform-validation-pending.md。
 
 # Verification expectations
 
 - 先完成平台边界和完整目标 Spec，按 Runtime 准备 Shape 确认后进入 Build。
-- 实施后运行前端类型检查/构建、原生构建、连接存储及桥接相关测试、真实窗口检查、两平台 QMYSQL 加载与测试连接检查。
+- 实施后运行前端类型检查/构建、原生构建、连接存储及桥接相关测试、真实窗口检查；目标系统 QMYSQL 加载与测试连接检查保留为后续待办。
 - Builder 提交前独立只读复核；Verify 使用新的只读 Verifier，结论保留实际环境与未运行项。

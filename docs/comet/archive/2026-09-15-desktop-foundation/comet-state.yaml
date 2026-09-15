@@ -1,0 +1,254 @@
+schema: comet.native.v4
+name: desktop-foundation
+language: zh-CN
+phase: archive
+status: done
+state_version: 20
+brief: brief.md
+shape_confirmation_hash: 69a98648b94b520ec4a966cbbe8c5efe247e2a4ca3dfd5ff8ad1ddb95137ab0a
+spec_changes:
+  - capability: desktop-foundation
+    operation: create
+    source: specs/desktop-foundation/spec.md
+workspace:
+  isolation: current
+  change_branch: null
+  target_branch: null
+  finish: null
+loop:
+  stage: done
+  goal_cycle: 2
+  iteration: 1
+  attempt: 1
+  retry_epoch: 0
+  failed_iteration_count: 0
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: null
+acceptance:
+  - id: A1
+    source: brief.md
+    text: A1：目标平台、架构、Qt 及构建工具版本明确；锁定 React 19.2.7、TypeScript 6.0.3、Ant Design
+      6.4.5，前端与原生工程可按说明构建。
+    result: passed
+    reason:
+      text: A1未变，复用HEAD独立通过的工具链、锁定依赖和前端/原生构建证据；目标平台实跑单列待办。
+      truncated: false
+  - id: A2
+    source: brief.md
+    text: A2：真实 Qt 桌面窗口加载本地 React 界面；桥接可返回成功、失败与任务状态；原生文件保存成功和取消均可正确反馈。
+    result: passed
+    reason:
+      text: A2未变，复用真实Qt本地React/桥接和原生导出成功失败取消的独立通过记录。
+      truncated: false
+  - id: A3
+    source: brief.md
+    text: A3：连接可新增、编辑、复制、删除与持久化；两端选择独立，删除配置不操作数据库；保存不依赖网络可达。
+    result: passed
+    reason:
+      text: A3未变，复用配置生命周期、持久化、损坏保护、凭据隔离和双端离线选择的独立通过记录。
+      truncated: false
+  - id: A4
+    source: brief.md
+    text: A4：密码默认仅会话使用，选择记住后按平台凭据机制保存与读取；取消记住或删除连接可清理对应凭据，不在普通文件或日志暴露密码。
+    result: passed
+    reason:
+      text: A4未变，复用真实Keychain9项和密码不落普通配置/探测输出证据；Windows凭据实跑待办保留。
+      truncated: false
+  - id: A5
+    source: brief.md
+    text: A5：真实 MySQL 连接测试可分别报告成功、认证失败、不可达与驱动缺失；任务执行不阻塞窗口，旧请求或参数变更前的结果不覆盖当前状态。
+    result: passed
+    reason:
+      text: A5未变，复用最终独立通过的真实MySQL分类、缺驱动、并发/stale/响应/计时/超时和关闭竞态修复证据；实现无变化。
+      truncated: false
+  - id: A6
+    source: brief.md
+    text: A6：中文 Ant Design 对照工作台骨架与连接抽屉可用；主题、密度和超时设置生效；缩放、键盘及窄窗口下关键操作可达，无虚假比对结果。
+    result: passed
+    reason:
+      text: A6未变，复用独立核对的原始CUA13条记录/9张匹配截图及多尺寸、高缩放、键盘、错误和主题证据。
+      truncated: false
+builder_handoff:
+  candidate_id: e37acae9-63f5-440a-9c63-daf571c519f9
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:3ecca24d-bbe1-49aa-807b-bb1e79971167
+  iteration: 1
+  summary:
+    text: Documentation-only archive boundary update authorized by user acceptance
+      and archive request. A1-A6 and implementation unchanged; prior A7
+      target-platform runtime checks explicitly deferred in
+      platform-validation-pending.md as NOT RUN, before verified-platform claims
+      or release. Reuse prior independent A1-A6 evidence.
+    truncated: false
+  addressed_acceptance_ids:
+    - A1
+    - A2
+    - A3
+    - A4
+    - A5
+    - A6
+  checks:
+    - name:
+        text: document-diff
+        truncated: false
+      result: passed
+      note:
+        text: git diff --check passed; review confirmed A1-A6 wording unchanged.
+        truncated: false
+    - name:
+        text: existing-implementation-evidence
+        truncated: false
+      result: passed
+      note:
+        text: Reuse earlier accepted A1-A6 current implementation checks; no new
+          business code.
+        truncated: false
+  checks_truncated: false
+  known_limits:
+    - text: Windows10/macOS15 runtime remains NOT RUN and is a durable follow-up
+        obligation, not a passed platform test.
+      truncated: false
+  known_limits_truncated: false
+  review:
+    status: passed
+    summary:
+      text: "Independent document review: A1-A6 unchanged, target platforms unchanged,
+        original A7 explicitly deferred with NOT RUN and pre-release
+        verification obligation; no false runtime claims."
+      truncated: false
+    reviewer_execution_ref: /root/archive_scope_review
+  submitted_at: 2026-09-15T06:23:07.540Z
+blockers: []
+verification:
+  candidate_id: e37acae9-63f5-440a-9c63-daf571c519f9
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:18abbf7a-5f98-497f-9a67-41c8d89cf21a
+  iteration: 1
+  attempt: 1
+  assurance: skill-coordinated
+  verdict: pass
+  checks:
+    - id: archive-doc-diff
+      name:
+        text: archive-doc-diff
+        truncated: false
+      argv_display:
+        - text: diff
+          truncated: false
+        - text: --check
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 11
+    - id: implementation-unchanged
+      name:
+        text: implementation-unchanged
+        truncated: false
+      argv_display:
+        - text: diff
+          truncated: false
+        - text: --exit-code
+          truncated: false
+        - text: HEAD
+          truncated: false
+        - text: --
+          truncated: false
+        - text: desktop
+          truncated: false
+        - text: frontend
+          truncated: false
+        - text: tests
+          truncated: false
+        - text: scripts
+          truncated: false
+        - text: CMakeLists.txt
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 10
+  summary:
+    text: 独立归档Verifier /root/archive_verifier
+      通过：当前A1-A6与平台目标未改，代码无变化，复用HEAD有效独立验收；原A7延期并保持NOT RUN，没有虚称平台实测通过。
+    truncated: false
+  risks:
+    - text: Windows10 x64/macOS15 arm64实际运行仍NOT
+        RUN；原A7持久化至platform-validation-pending.md，正式发行或已验证平台声明前补验。
+      truncated: false
+  risks_truncated: false
+  completed_at: 2026-09-15T06:25:10.439Z
+history:
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 1
+    outcome: fail
+    unresolved_ids:
+      - A5
+      - A6
+      - A7
+    summary:
+      text: 独立Verifier
+        /root/d1_verifier：A1-A4通过，A5运行中耗时遗漏及异步证据缺口，A6窄窗高缩放表单键盘证据缺口，返回Build修复；A7外部环境blocked。
+      truncated: false
+    completed_at: 2026-09-15T05:38:36.773Z
+  - goal_cycle: 1
+    iteration: 2
+    attempt: 1
+    outcome: fail
+    unresolved_ids:
+      - A5
+      - A7
+    summary:
+      text: 独立Verifier /root/d1_verifier_2：A6补证通过；A5关闭确认竞态需修复；A7外部环境blocked。
+      truncated: false
+    completed_at: 2026-09-15T05:54:47.404Z
+  - goal_cycle: 1
+    iteration: 3
+    attempt: 1
+    outcome: blocked
+    unresolved_ids:
+      - A7
+    summary:
+      text: 独立Verifier
+        /root/d1_verifier_3：A5通过，A7因外部目标系统环境缺失blocked；A1-A4/A6先前已通过且未受本轮影响。
+      truncated: false
+    completed_at: 2026-09-15T06:03:25.864Z
+  - goal_cycle: 1
+    iteration: 3
+    attempt: 1
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: 用户已接受当前6/7交付并明确要求归档；将Windows10/macOS15真实运行验收从本次归档阻塞移为明确的后续待办，保留NOT
+        RUN和平台支持目标，不声称实测通过。仅调整交付验收边界，不修改实现。
+      truncated: false
+    completed_at: 2026-09-15T06:20:39.046Z
+  - goal_cycle: 2
+    iteration: 1
+    attempt: 1
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: 独立归档Verifier /root/archive_verifier
+        通过：当前A1-A6与平台目标未改，代码无变化，复用HEAD有效独立验收；原A7延期并保持NOT RUN，没有虚称平台实测通过。
+      truncated: false
+    completed_at: 2026-09-15T06:25:10.439Z
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pass
+verification_report: verification.md
+archived: true
+created_at: 2026-09-15T04:55:22.802Z
