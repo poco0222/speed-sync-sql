@@ -71,7 +71,7 @@ void Foundation::runSyncProcess(const QJsonObject &payload, std::function<void(Q
 
 void Foundation::planSync(const QString &id, const QJsonObject &args) {
     if (!loadError.isEmpty()) { reply(id, fail(loadError, "storage")); return; }
-    if (!jobs.isEmpty() || syncExecuting) { reply(id, fail("请等待当前任务结束", "busy")); return; }
+    if (!jobs.isEmpty() || syncExecuting || mergeExecuting) { reply(id, fail("请等待当前任务结束", "busy")); return; }
     if (comparison.isEmpty()) { reply(id, fail("请先重新比对", "stale")); return; }
     syncPlan = {};
     QJsonObject payload{{"operation", "plan-sync"}, {"expected", comparison}, {"args", args}};
@@ -97,7 +97,9 @@ void Foundation::recoverSyncRecords() {
         QFile file(folder.filePath(name));
         if (!file.open(QIODevice::ReadOnly)) continue;
         auto record = QJsonDocument::fromJson(file.readAll()).object();
-        if (QUuid(record["id"].toString()).isNull() || !record["steps"].isArray()) continue;
+        const bool dataRecord=record["mode"]=="data-fill" || record["mode"]=="data-merge";
+        if (QUuid(record["id"].toString()).isNull() || !(dataRecord?record["batches"].isArray():record["steps"].isArray())) continue;
+        bool recovered=record["status"]=="running";
         if (record["status"] == "running") {
             record["status"] = "unknown"; record["error"] = "上次执行未正常结束，请重新比对核实；不会自动重试";
             auto steps = record["steps"].toArray();
@@ -105,6 +107,12 @@ void Foundation::recoverSyncRecords() {
             record["steps"] = steps;
             if (!writeJson(folder.filePath(name), record)) record["storageWarning"] = "恢复状态无法保存，原文件已保留";
         }
+        if(record["mode"]=="data-fill" || record["mode"]=="data-merge") {
+            auto batches=record["batches"].toArray();
+            for(qsizetype i=0;i<batches.size();++i) { auto batch=batches[i].toObject(); if(batch["status"]=="running") {batch["status"]="unknown";batches[i]=batch;recovered=true;} }
+            record["batches"]=batches;
+        }
+        if(recovered && !writeJson(folder.filePath(name),record)) record["storageWarning"]="恢复状态无法保存，原文件已保留";
         records.append(record);
     }
 }
@@ -135,7 +143,7 @@ QJsonObject Foundation::syncOperation(const QString &operation, const QJsonObjec
             if (!writeJson(filename, record)) return fail("记录导出失败", "storage");
             return {{"ok", true}};
         }
-        if (syncExecuting || !jobs.isEmpty()) return fail("请等待当前任务结束", "busy");
+        if (syncExecuting || mergeExecuting || !jobs.isEmpty()) return fail("请等待当前任务结束", "busy");
         auto next = state; QJsonObject workspace;
         for (auto side : {"left", "right"}) {
             auto endpoint = record[side].toObject(); auto c = find(endpoint["connectionId"].toString());
@@ -165,7 +173,7 @@ QJsonObject Foundation::syncOperation(const QString &operation, const QJsonObjec
         return {{"ok", true}};
     }
     if (operation != "execute-sync") return fail("未知同步操作", "validation");
-    if (syncExecuting || !jobs.isEmpty()) return fail("请等待当前任务结束", "busy");
+    if (syncExecuting || mergeExecuting || !jobs.isEmpty()) return fail("请等待当前任务结束", "busy");
     if (syncPlan.isEmpty() || args["planId"] != syncPlan["id"] || syncPlan["generation"].toString() != QString::number(planGeneration)) return fail("计划已过期，请重新预览", "stale");
     if (syncPlan["steps"].toArray().isEmpty()) return fail("计划没有可执行操作");
     syncPayload = {}; QString error;

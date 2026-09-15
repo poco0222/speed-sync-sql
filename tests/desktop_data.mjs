@@ -171,11 +171,14 @@ try {
   await evaluate(`document.querySelector('.ant-drawer-close').click()`);
   await button('设置');
   const selectOption=async(label,text)=>{
-    const rect=await evaluate(`(()=>{const el=document.querySelector('[aria-label="'+${JSON.stringify(label)}+'"]');const r=el.getBoundingClientRect();return {x:r.x+5,y:r.y+5};})()`);
+    // Modal entry and the previous popup exit can move or cover a valid DOM target.
+    await waitFor(`(()=>{const input=document.querySelector('[aria-label="'+${JSON.stringify(label)}+'"]');const el=input?.closest('.ant-select');const modal=el?.closest('.ant-modal');if(!el||!modal||modal.getAnimations({subtree:true}).some(a=>a.playState==='running'))return false;const r=el.getBoundingClientRect();return r.width>0&&r.height>0&&el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));})()`);
+    const rect=await evaluate(`(()=>{const el=document.querySelector('[aria-label="'+${JSON.stringify(label)}+'"]').closest('.ant-select');const r=el.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()`);
     await command('Input.dispatchMouseEvent',{type:'mousePressed',...rect,button:'left',clickCount:1});
     await command('Input.dispatchMouseEvent',{type:'mouseReleased',...rect,button:'left',clickCount:1});
     await waitFor(`[...document.querySelectorAll('.ant-select-item-option-content')].some(e=>e.innerText===${JSON.stringify(text)})`);
     await evaluate(`[...document.querySelectorAll('.ant-select-item-option-content')].find(e=>e.innerText===${JSON.stringify(text)}).click()`);
+    await waitFor(`(()=>{const el=document.querySelector('[aria-label="'+${JSON.stringify(label)}+'"]').closest('.ant-select');return el.innerText.includes(${JSON.stringify(text)})&&![...document.querySelectorAll('.ant-select-dropdown')].some(p=>getComputedStyle(p).display!=='none'&&p.getBoundingClientRect().height>0);})()`);
   };
   await selectOption('主题','深色');await selectOption('密度','紧凑');await button('保存设置');
   await waitFor(`document.documentElement.dataset.theme==='dark'`);

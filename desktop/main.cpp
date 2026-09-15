@@ -47,7 +47,7 @@ public:
         if (!bridge->busy()) { event->accept(); return; }
         event->ignore();
         if (closing) return;
-        QMessageBox question(QMessageBox::Question, "结束后台任务", "仍有后台任务运行。请求停止并退出？结构执行会等待当前语句结束，已发生的变更不会回滚。", QMessageBox::Yes | QMessageBox::No, this);
+        QMessageBox question(QMessageBox::Question, "结束后台任务", "仍有后台任务运行。请求停止并退出？结构执行会等待当前语句结束；数据执行会在批次边界停止，已提交批次保留。", QMessageBox::Yes | QMessageBox::No, this);
         question.button(QMessageBox::Yes)->setText("结束并退出");
         question.button(QMessageBox::No)->setText("继续运行");
         question.setDefaultButton(QMessageBox::No);

@@ -19,7 +19,7 @@ class Foundation : public QObject {
 public:
     explicit Foundation(QString directory, QObject *parent = nullptr);
     ~Foundation() override;
-    bool busy() const { return !jobs.isEmpty(); }
+    bool busy() const { return mergeExecuting || !jobs.isEmpty(); }
     void stopJobs();
     QJsonObject snapshot() const;
     QJsonObject execute(const QString &operation, const QJsonObject &args);
@@ -38,6 +38,16 @@ private:
     void invalidateData();
     void dataTask(const QString &id, const QString &operation, const QJsonObject &args);
     QJsonObject dataOperation(const QString &operation, const QJsonObject &args);
+    QJsonObject mergePlan, mergeRecord, mergePayload;
+    bool mergeExecuting = false, mergeStop = false;
+    int mergeOffset = 0;
+    quint64 mergeGeneration = 0;
+    void planMerge(const QString &id, const QJsonObject &args);
+    QJsonObject mergeOperation(const QString &operation, const QJsonObject &args);
+    void runMergeProcess(const QJsonObject &payload, std::function<void(QJsonObject)> done);
+    void advanceMerge();
+    void finishMerge(const QString &status, const QString &error = {});
+    bool saveMergeRecord();
     QString directory, loadError;
     QJsonObject state;
     QHash<QString, QString> passwords;

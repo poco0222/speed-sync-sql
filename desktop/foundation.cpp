@@ -152,9 +152,10 @@ bool Foundation::persist(const QJsonObject &next, QString &error) {
 QJsonObject Foundation::execute(const QString &operation, const QJsonObject &args) {
     if (operation == "snapshot") return success({{"state", snapshot()}});
     if (!loadError.isEmpty()) return failure(loadError, "storage");
+    if (operation.startsWith("merge-")) return mergeOperation(operation, args);
     if (operation.startsWith("data-")) return dataOperation(operation, args);
     if (operation.contains("sync") || operation == "invalidate-plan") return syncOperation(operation, args);
-    if (syncExecuting && QStringList{"save", "delete", "select", "workspace", "settings", "cancel-schema"}.contains(operation)) return failure("结构执行中，请等待结束后修改上下文", "busy");
+    if ((syncExecuting || mergeExecuting) && QStringList{"save", "delete", "select", "workspace", "settings", "cancel-schema"}.contains(operation)) return failure("结构执行中，请等待结束后修改上下文", "busy");
     auto next = state;
     QString error;
     if (operation == "save") {
@@ -317,6 +318,7 @@ void Foundation::request(const QString &json) {
     if (id.isEmpty() || id.size() > 100) return;
     if (error.error != QJsonParseError::NoError || !o["args"].isObject()) { reply(id, failure("请求格式无效", "validation")); return; }
     if (o["operation"] == "data-prepare" || o["operation"] == "data-start") dataTask(id, o["operation"].toString(), o["args"].toObject());
+    else if (o["operation"] == "merge-plan") planMerge(id, o["args"].toObject());
     else if (o["operation"] == "plan-sync") planSync(id, o["args"].toObject());
     else if (o["operation"] == "test") test(id, o["args"].toObject());
     else if (o["operation"] == "schema" || o["operation"] == "compare") schemaTask(id, o["operation"].toString(), o["args"].toObject());
@@ -388,7 +390,7 @@ void Foundation::invalidateSchema() {
 }
 void Foundation::schemaTask(const QString &id, const QString &operation, const QJsonObject &args) {
     if (!loadError.isEmpty()) { reply(id, failure(loadError, "storage")); return; }
-    if (syncExecuting || jobs.contains("sync")) { reply(id, failure("同步任务进行中", "busy")); return; }
+    if (syncExecuting || mergeExecuting || jobs.contains("sync")) { reply(id, failure("同步任务进行中", "busy")); return; }
     const bool comparing = operation == "compare";
     const auto side = args["side"].toString();
     if (!comparing && (side != "left" && side != "right")) { reply(id, failure("连接端无效", "validation")); return; }
@@ -443,7 +445,10 @@ void Foundation::schemaTask(const QString &id, const QString &operation, const Q
     process->start(); timer->start(comparing ? 120000 : 65000); emit activityChanged();
 }
 void Foundation::stopJobs() {
-    syncStop = true;
-    if (!syncExecuting) invalidateSchema();
-    for (auto it = jobs.cbegin(); it != jobs.cend(); ++it) if (it.key() != "sync" || !syncExecuting) it.value()->kill();
+    syncStop = true; mergeStop = true;
+    if (!syncExecuting && !mergeExecuting) invalidateSchema();
+    for (auto it = jobs.cbegin(); it != jobs.cend(); ++it) {
+        if ((it.key()=="sync" && syncExecuting)||(it.key()=="merge" && mergeExecuting)) continue;
+        it.value()->kill();
+    }
 }

@@ -27,12 +27,13 @@ Foundation::~Foundation() {
     dataLock.reset(); dataTemp.reset();
 }
 void Foundation::invalidateData() {
-    ++dataGeneration; dataState={};
+    ++dataGeneration; ++mergeGeneration; mergePlan={}; dataState={};
     const auto oldPath=dataPath; dataPath.clear(); bool running=false;
     for(auto it=jobs.cbegin();it!=jobs.cend();++it) if(it.key().startsWith("data:")) { it.value()->setProperty("cancelled",true); if(it.value()->property("dataPath").toString()==oldPath) running=true; it.value()->kill(); }
     if(!running && !oldPath.isEmpty()) QDir(oldPath).removeRecursively();
 }
 QJsonObject Foundation::dataOperation(const QString &operation,const QJsonObject &args) {
+    if(mergeExecuting && operation!="data-status" && operation!="data-page" && operation!="data-detail") return fail("数据执行中不能修改上下文","busy");
     if(operation=="data-invalidate") {
         if(args.contains("taskId") && args["taskId"]!=dataState["id"]) return fail("数据任务已失效","stale"); invalidateData(); return {{"ok",true}};
     }
@@ -44,7 +45,9 @@ QJsonObject Foundation::dataOperation(const QString &operation,const QJsonObject
     }
     if(dataState.isEmpty() || !args["taskId"].isString() || args["taskId"]!=dataState["id"]) return fail("数据任务已失效，请重新比对","stale");
     if(dataState["state"]=="running") {
-        QFile f(dataPath+"/status.json"); if(f.open(QIODevice::ReadOnly)) { const auto status=QJsonDocument::fromJson(f.readAll()).object(); if(status["id"]==dataState["id"]) dataState=status; }
+        QFile f(dataPath+"/status.json"); if(f.open(QIODevice::ReadOnly)) { const auto status=QJsonDocument::fromJson(f.readAll()).object(); if(status["id"]==dataState["id"]) { dataState=status;
+            if(status["state"]=="complete" && jobs.contains("data:"+dataState["id"].toString())) { dataState["state"]="running";dataState["complete"]=false;dataState["phase"]="finalizing"; }
+        } }
     }
     if(operation=="data-status") return {{"ok",true},{"task",dataState}};
     if(operation=="data-page" || operation=="data-detail") return readDataResult(dataPath,operation,args,dataState["complete"].toBool());
@@ -52,7 +55,7 @@ QJsonObject Foundation::dataOperation(const QString &operation,const QJsonObject
 }
 void Foundation::dataTask(const QString &id,const QString &operation,const QJsonObject &args) {
     if(!loadError.isEmpty()) { reply(id,fail(loadError,"storage")); return; }
-    if(syncExecuting || jobs.contains("sync")) { reply(id,fail("结构同步进行中，请等待结束","busy")); return; }
+    if(syncExecuting || mergeExecuting || jobs.contains("sync") || jobs.contains("merge")) { reply(id,fail("结构同步进行中，请等待结束","busy")); return; }
     if(!dataTemp || !dataTemp->isValid()) { reply(id,fail("无法创建私有临时结果目录","storage")); return; }
     QJsonObject payload{{"operation",operation},{"args",args}}; QString error;
     if(!syncConnections(payload,error)) { reply(id,fail(error,"credentials")); return; }

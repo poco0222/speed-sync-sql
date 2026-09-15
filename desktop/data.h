@@ -6,3 +6,5 @@
 QString canonicalDataValue(const QString &type, const QString &text, bool *ok);
 QJsonObject runDataCommand(const QJsonObject &input);
 QJsonObject readDataResult(const QString &path, const QString &operation, const QJsonObject &args, bool complete);
+
+QJsonObject readMergePage(const QString &path, const QJsonObject &args);
