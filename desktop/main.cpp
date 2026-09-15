@@ -11,6 +11,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QStandardPaths>
+#include <QSqlDatabase>
 #include <QTimer>
 #include <QThread>
 #include <QWebChannel>
@@ -58,6 +59,17 @@ public:
     }
 };
 int main(int argc, char **argv) {
+    if (argc > 1 && QByteArray(argv[1]) == "--deployment-check") {
+        QCoreApplication app(argc, argv);
+        const auto base = QCoreApplication::applicationDirPath();
+        // Do not let a runner's Qt installation hide a missing packaged driver.
+        QCoreApplication::setLibraryPaths({base, base + "/plugins", base + "/../PlugIns"});
+        const bool mysqlValid = QSqlDatabase::addDatabase("QMYSQL", "deployment-mysql").isValid();
+        const bool sqliteValid = QSqlDatabase::addDatabase("QSQLITE", "deployment-sqlite").isValid();
+        const auto report = QJsonDocument(QJsonObject{{"mysqlValid", mysqlValid}, {"sqliteValid", sqliteValid}, {"qt", qVersion()}}).toJson(QJsonDocument::Compact);
+        std::fwrite(report.constData(), 1, report.size(), stdout);
+        return mysqlValid && sqliteValid ? 0 : 1;
+    }
     bool probe = argc > 1 && QByteArray(argv[1]) == "--probe";
     bool schema = argc > 1 && QByteArray(argv[1]) == "--schema";
     bool data = argc > 1 && QByteArray(argv[1]) == "--data";

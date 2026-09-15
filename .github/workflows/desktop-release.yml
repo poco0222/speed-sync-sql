@@ -1,0 +1,55 @@
+name: Desktop release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-x64
+            runner: windows-2022
+            qt-arch: win64_msvc2022_64
+          - platform: macos-arm64
+            runner: macos-15
+            qt-arch: clang_64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.19.0'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+        with:
+          arch: x64
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.10.2'
+          arch: ${{ matrix.qt-arch }}
+          modules: 'qtwebengine qtwebchannel qtpositioning'
+          cache: true
+      - name: Build, test and package
+        run: python scripts/release.py --qt-root "${{ env.QT_ROOT_DIR }}"
+      - name: Upload distribution
+        uses: actions/upload-artifact@v4
+        with:
+          name: speed-sync-sql-${{ matrix.platform }}-${{ github.run_number }}
+          path: .local/release/artifacts/*
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0

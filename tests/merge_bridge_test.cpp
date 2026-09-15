@@ -40,7 +40,7 @@ class MergeBridgeTest : public QObject {
 private slots:
     void deleteConfirmation() {
         QTemporaryDir dir;Foundation s(dir.path());setup(s);auto p=plan(s,"align");QVERIFY(p["ok"].toBool());
-        const auto id=p["plan"].toObject()["id"];
+        const QJsonValue id=p["plan"].toObject()["id"];
         QCOMPARE(execute(s,p)["code"].toString(),QString("validation"));QVERIFY(!s.busy());
         auto args=QJsonObject{{"planId",id},{"confirmed",true},{"deleteConfirmed",true}};
         QVERIFY(s.execute("merge-execute",args)["ok"].toBool());
@@ -57,7 +57,7 @@ private slots:
     }
     void confirmationStaleAndDuplicate() {
         QTemporaryDir dir;Foundation s(dir.path());setup(s);auto p=plan(s);QVERIFY(p["ok"].toBool());
-        const auto id=p["plan"].toObject()["id"];
+        const QJsonValue id=p["plan"].toObject()["id"];
         QCOMPARE(s.execute("merge-execute",{{"planId",id}})["code"].toString(),QString("validation"));
         QVERIFY(s.execute("merge-invalidate",{})["ok"].toBool());
         QCOMPARE(execute(s,p)["code"].toString(),QString("stale"));

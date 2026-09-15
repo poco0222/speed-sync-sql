@@ -4,6 +4,12 @@ Qt 6.10.2 + React 的 MySQL 桌面结构比对工具。D1 提供连接管理、�
 
 目标：Windows 10 1809+ x64、macOS 15+ arm64。本机开发环境为 macOS 27 arm64；Windows 10/macOS 15 的运行验证尚未完成。不能把本机构建成功当作双平台验收通过。
 
+## GitHub Actions 打包（D7）
+
+在 **Actions → Desktop release → Run workflow** 手动构建 Windows x64 / macOS arm64 分发包。成功后从该次运行的 Artifacts 下载 ZIP 或 `.app` 的 tar.gz 包及 SHA-256 文件。流程包含 Release 构建、适用测试、Qt/WebEngine 与 QMYSQL 依赖部署及驱动加载检查。
+
+工作流首次合入默认分支后才会显示触发入口。包不作发行签名或公证，不自动创建 GitHub Release；CI 构建不替代最低系统、干净机器与完整桌面实测。步骤、依赖及限制见 [桌面打包说明](docs/development/desktop-release.md)。
+
 ## macOS 构建和启动
 
 复用 `/Users/PopoY/Documents/DevTools/Qt/6.10.2/macos`，CMake 3.30.5、Ninja 1.12.1、Node 24.19.0。脚本可通过 `SPEED_SYNC_QT_ROOT`、`SPEED_SYNC_QT_TOOLS`、`SPEED_SYNC_MYSQL_PLUGIN` 覆盖工具位置。
