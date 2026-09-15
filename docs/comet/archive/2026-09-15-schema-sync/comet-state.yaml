@@ -1,0 +1,300 @@
+schema: comet.native.v4
+name: schema-sync
+language: zh-CN
+phase: archive
+status: done
+state_version: 11
+brief: brief.md
+shape_confirmation_hash: b035ef4a76a1512d843887588681d0ae9ad586128bca81aa7cba03e47070e9fd
+spec_changes:
+  - capability: schema-sync
+    operation: create
+    source: specs/schema-sync/spec.md
+workspace:
+  isolation: current
+  change_branch: main
+  target_branch: main
+  finish: null
+loop:
+  stage: done
+  goal_cycle: 2
+  iteration: 1
+  attempt: 1
+  retry_epoch: 0
+  failed_iteration_count: 0
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: null
+acceptance:
+  - id: A1
+    source: brief.md
+    text: A1：左右方向正确标明读取端与写入端，不同名配对保留目标表名；初次不全选，过滤全选仅作用于可见可执行项，跨类别保留选择；连接/库表/方向/选区变更或刷新使旧计划不可执行；同一物理表不得对自身同步。
+    result: passed
+    reason:
+      text: SyncPanel 明示读写方向；buildSyncPlan 保留目标库表名并检查 serverUuid
+        与大小写规则，阻止自身同步。selectVisible 仅处理可见可执行项并保留其他选择；原生代次与计划 ID
+        阻止旧计划及重复执行。真实反向/异名样本、桌面空选区及生命周期测试通过。
+      truncated: false
+  - id: A2
+    source: brief.md
+    text: A2：隔离 MySQL 样本中，普通字段属性及顺序、普通/唯一/主键/全文/空间索引和常规表属性生成准确新增/修改/删除
+      SQL；仅改变选区及明确纳入的依赖；整表对齐遇不支持项阻塞，删除、缩窄、转换、NOT NULL/唯一性风险可见。
+    result: passed
+    reason:
+      text: buildSyncPlan 从原定义生成字段、索引和表属性
+        SQL，选区依赖需明确纳入；整表对齐遇特殊对象阻止。d3-integration.json 中 attributes、features 和
+        partial_selection_preserves_unselected_difference
+        通过，覆盖常规属性、顺序、各类索引及未选差异保留。预览截图显示逐对象增改删、完整 SQL 与破坏性风险。
+      truncated: false
+  - id: A3
+    source: brief.md
+    text: A3：确证目标缺表时可创建保留目标名称的受支持表，源缺表不生成 DROP
+      TABLE；特殊语法、权限不明、外部依赖无法确认时阻止相关计划并保留定义，不自动改外部表或关闭约束。
+    result: passed
+    reason:
+      text: readConnected 仅在错误码 1146 且有明确权限时认定缺表；同步还要求依赖可见性。buildSyncPlan
+        阻止源缺表删除、特殊对象完整对齐和入向外键相关改动。真实缺表创建、source_missing_no_drop、parent_blocked、unsupported_blocked
+        通过；代码未生成整表删除或关闭约束操作。
+      truncated: false
+  - id: A4
+    source: brief.md
+    text: A4：基本触发器可新增/替换/删除，保留 DEFINER、sql_mode
+      和字符集/排序上下文；只定位所属目标表，不全文改写正文；不能可靠保留顺序/上下文或有名称冲突时阻塞；含分号正文完整执行。
+    result: passed
+    reason:
+      text: 触发器计划保留原 DEFINER、正文和会话上下文，仅重定向所属表；名称冲突、同事件顺序及不可靠编码保守阻止。DROP/CREATE
+        分步记录，协议执行不按分号拆分，导出使用独立分隔符。真实触发器新增/替换/删除和 trigger_semicolon_and_context
+        通过。
+      truncated: false
+  - id: A5
+    source: brief.md
+    text: A5：预览包含目标、摘要、关联操作、风险及完整 SQL，复制/原生导出完整，不能编辑任意
+      SQL；一次摘要确认覆盖破坏性条目；执行前两端漂移检查或原结构/初始记录保存失败时零写入。
+    result: passed
+    reason:
+      text: SyncPanel 提供只读 SQL、目标、操作统计、关联操作及一次摘要确认；原生复制和 QSaveFile 导出使用完整计划
+        SQL。execute-sync 在任何 DDL 前保存原结构与初始记录，再由 sync-check 核对两端。真实
+        drift_rejected_target_unchanged 与 initialStorageFailure 测试通过。
+      truncated: false
+  - id: A6
+    source: brief.md
+    text: A6：只执行原生端当前计划，防重复提交并锁定上下文；顺序执行、失败停止，成功/失败/未执行分开；停止在语句边界生效，断线或进程异常标结果待核实且不自动重试，不承诺多条
+      DDL 整体回滚。
+    result: passed
+    reason:
+      text: 原生端按当前计划 ID/代次执行并锁定上下文；advanceSync
+        逐步保存、顺序执行，失败或记录保存失败立即停止。停止在语句边界处理；超时、进程异常和连接结果不明标
+        unknown，无自动重试。staleAndDuplicateProtection、stoppedAtBoundary、failureAndUnknown
+        和 stepStorageFailure 均通过。
+      truncated: false
+  - id: A7
+    source: brief.md
+    text: A7：执行后重新比对，区分语句执行和结构复核结果；记录跨重启保存别名/库表/方向/时间/SQL/原结构/逐步结果，异常退出未完成步骤标待核实；可过滤、查看、导出，不能重放旧计划；不保存密码、完整连接串或业务行数据。
+    result: passed
+    reason:
+      text: verifySync 单独保存结构复核结果；记录包含配对、方向、时间、SQL、原结构和步骤状态。SyncRecords
+        支持过滤、详情、导出及恢复工作台，不重放计划；恢复时核对连接摘要。Foundation
+        重建、crashRecovery、敏感字段断言及真实桌面记录详情/页面重载检查通过。
+      truncated: false
+  - id: A8
+    source: brief.md
+    text: A8：D1/D2 回归、前端/原生构建及规则/桥接/异步测试通过；隔离 MySQL 和真实 Qt WebEngine
+      覆盖选择、预览、确认、执行、记录及复核，窄窗口/主题/密度下主动作可达；Windows/macOS 最低系统未实测明确 NOT RUN。
+    result: passed
+    reason:
+      text: 核对 Runtime 最终检查结果及 build/Testing/Temporary/LastTest.log：前端 11 项、原生 5
+        组通过；真实 MySQL 15 项及 Qt WebEngine 8 项通过。已查看 1024
+        深色紧凑截图，预览与执行主动作可达。前端/原生构建通过证据已提供；最低目标系统明确 NOT RUN。
+      truncated: false
+builder_handoff:
+  candidate_id: 9b17d74e-f884-4126-ade9-612e6c838ab1
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:e5a0a7ce-491b-484e-ace7-e6549af4d746
+  iteration: 1
+  summary:
+    text: D3
+      常规结构同步闭环完成：原生计划/依赖/语义计数/只读SQL、漂移检查、持久化结构与记录、隔离顺序执行/停止/未知结果、复核和桌面记录入口；独立复核问题已修复。
+    truncated: false
+  addressed_acceptance_ids:
+    - A1
+    - A2
+    - A3
+    - A4
+    - A5
+    - A6
+    - A7
+    - A8
+  checks:
+    - name:
+        text: frontend-tests-build
+        truncated: false
+      result: passed
+      note:
+        text: 11 tests; TypeScript/Vite built; existing chunk warning
+        truncated: false
+    - name:
+        text: native-build
+        truncated: false
+      result: passed
+      note:
+        text: Final native candidate rebuilt successfully
+        truncated: false
+    - name:
+        text: ctest
+        truncated: false
+      result: passed
+      note:
+        text: 5 groups before final additional generation regression; final run
+          requested through Runtime
+        truncated: false
+    - name:
+        text: real-mysql-desktop
+        truncated: false
+      result: passed
+      note:
+        text: 15 MySQL and 8 desktop before final scope-depth/selection fixes; final
+          rerun requested through Runtime
+        truncated: false
+  checks_truncated: false
+  known_limits:
+    - text: Windows 10/macOS 15 and other MySQL versions NOT RUN; inherited platform
+        pending
+      truncated: false
+    - text: Complex grants, special objects and non-UTF8 trigger client contexts
+        conservatively blocked
+      truncated: false
+    - text: No whole-plan DDL rollback or data backup; observable preflight is not a
+        concurrent lock
+      truncated: false
+  known_limits_truncated: false
+  review:
+    status: passed
+    summary:
+      text: Independent read-only review covered SQL, dependencies, lifecycle, records
+        and UI; same-object dependency selection fixed; final scope-depth and
+        generation regression changes reviewed passed.
+      truncated: false
+    reviewer_execution_ref: /root/d3_review
+  submitted_at: 2026-09-15T07:45:48.134Z
+blockers: []
+verification:
+  candidate_id: 9b17d74e-f884-4126-ade9-612e6c838ab1
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:ff72e7c5-7c71-4a3b-893a-58edab9c2498
+  iteration: 1
+  attempt: 1
+  assurance: skill-coordinated
+  verdict: pass
+  checks:
+    - id: d3-frontend
+      name:
+        text: Frontend regression
+        truncated: false
+      argv_display:
+        - text: --prefix
+          truncated: false
+        - text: frontend
+          truncated: false
+        - text: test
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 201
+    - id: d3-native
+      name:
+        text: Native regression and lifecycle
+        truncated: false
+      argv_display:
+        - text: --test-dir
+          truncated: false
+        - text: build
+          truncated: false
+        - text: --output-on-failure
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 17417
+    - id: d3-real
+      name:
+        text: Real isolated MySQL and Qt desktop final candidate
+        truncated: false
+      argv_display:
+        - text: tests/integration_sync.py
+          truncated: false
+        - text: --mysql-home
+          truncated: false
+        - text: /Users/PopoY/Documents/DevTools/mysql/current
+          truncated: false
+        - text: --app
+          truncated: false
+        - text: build/speed-sync-sql.app/Contents/MacOS/speed-sync-sql
+          truncated: false
+        - text: --output
+          truncated: false
+        - text: .local/evidence/d3-integration.json
+          truncated: false
+        - text: --desktop-script
+          truncated: false
+        - text: tests/desktop_sync.mjs
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 9613
+  summary:
+    text: 独立只读验收通过，A1-A8 均满足当前确认范围。先核对 brief/spec、实现、测试及真实证据，最后读取
+      handoff；未发现必须修复的问题。未编辑文件、未自行运行构建或数据库写入。执行标识 /root/d3_verifier。
+    truncated: false
+  risks:
+    - text: Windows 10/macOS 15 实机、其他 MySQL 版本、压力规模及正式安装包未验证，不能据此声称全平台通过。
+      truncated: false
+    - text: 本轮 CTest 中两项系统凭据 opt-in 测试为 SKIP；同步测试使用隔离凭据，不代表本轮重验系统凭据生命周期。
+      truncated: false
+    - text: 停止、进程异常、存储失败和异常退出恢复主要由可控子进程及记录夹具覆盖；不是实际 MySQL 断网或操作系统强杀的端到端证据。
+      truncated: false
+    - text: 原生 SQL/记录导出路径已静态核对；本轮真实桌面证据未覆盖系统保存对话框及剪贴板内容的端到端操作。
+      truncated: false
+    - text: 写前核对不是并发锁；多条 DDL 不保证整体回滚，原结构定义不能恢复已删除的数据。
+      truncated: false
+  risks_truncated: false
+  completed_at: 2026-09-15T07:51:18.610Z
+history:
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 0
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Native Shape artifacts changed
+      truncated: false
+    completed_at: 2026-09-15T07:45:19.490Z
+  - goal_cycle: 2
+    iteration: 1
+    attempt: 1
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: 独立只读验收通过，A1-A8 均满足当前确认范围。先核对 brief/spec、实现、测试及真实证据，最后读取
+        handoff；未发现必须修复的问题。未编辑文件、未自行运行构建或数据库写入。执行标识 /root/d3_verifier。
+      truncated: false
+    completed_at: 2026-09-15T07:51:18.610Z
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pass
+verification_report: verification.md
+archived: true
+created_at: 2026-09-15T07:19:39.030Z
