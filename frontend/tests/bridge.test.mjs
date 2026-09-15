@@ -29,6 +29,18 @@ test('schema bridge preserves native statuses and bounds compare/save-dialog tim
     assert.equal(timers.at(-1), 75000);
     receive(JSON.stringify({ requestId: sent[2].requestId, ok: false, error: 'permission denied' }));
     assert.equal((await pendingList).error, 'permission denied');
+    for (const [operation,args,delay,response] of [
+      ['plan-sync',{direction:'right-to-left',selected:[{category:'columns',name:'id'}],alignAll:false},180000,{ok:false,blockers:['incoming dependency']}],
+      ['execute-sync',{planId:'native-plan'},75000,{ok:true,id:'record-1'}],
+      ['sync-status',{},75000,{ok:true,running:true,record:{id:'record-1',status:'running'}}],
+      ['export-sync',{planId:'native-plan'},600000,{ok:true,cancelled:true}],
+      ['export-sync-record',{id:'record-1'},600000,{ok:false,error:'storage failure'}]
+    ]) {
+      const pending=request(operation,args); await Promise.resolve();
+      const last=sent.at(-1); assert.equal(last.operation,operation); assert.deepEqual(last.args,args); assert.equal(timers.at(-1),delay);
+      receive(JSON.stringify({requestId:last.requestId,...response}));
+      assert.deepEqual(await pending,{requestId:last.requestId,...response});
+    }
   } finally {
     globalThis.setTimeout = originalSetTimeout;
     globalThis.clearTimeout = originalClearTimeout;

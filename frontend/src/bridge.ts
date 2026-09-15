@@ -1,3 +1,4 @@
+import type { SyncPlan, SyncRecord } from './sync';
 import type { Comparison, Workspace } from './schema';
 export type Connection = {
   id?: string; name: string; host: string; port: number; user: string;
@@ -8,7 +9,7 @@ export type Connection = {
 export type Settings = { theme: 'system' | 'light' | 'dark'; density: 'standard' | 'compact'; timeout: number };
 export type State = { connections: Connection[]; left: string; right: string; settings: Settings; loadError?: string; qtVersion?: string; driverAvailable?: boolean; workspace?: Partial<Workspace> };
 export type TestResult = { ok: boolean; error?: string; code?: string; version?: string; database?: string; encrypted?: boolean; testedAt?: string; elapsedMs?: number; stale?: boolean; storageWarning?: string };
-export type Result = TestResult & { state?: State; id?: string; cancelled?: boolean; items?: { name: string; type?: string }[]; comparison?: Comparison };
+export type Result = TestResult & { state?: State; id?: string; cancelled?: boolean; items?: { name: string; type?: string }[]; comparison?: Comparison; plan?: SyncPlan; blockers?: string[]; running?: boolean; record?: SyncRecord; records?: SyncRecord[] };
 type Native = { request: (json: string) => void; response: { connect: (callback: (json: string) => void) => void } };
 declare global {
   interface Window {
@@ -40,7 +41,7 @@ export async function request(operation: string, args: object = {}): Promise<Res
   await ready();
   const requestId = `request-${++sequence}`;
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => { pending.delete(requestId); reject(new Error('桌面请求未返回，请检查应用状态')); }, ['export', 'export-schema'].includes(operation) ? 600000 : operation === 'compare' ? 180000 : 75000);
+    const timer = setTimeout(() => { pending.delete(requestId); reject(new Error('桌面请求未返回，请检查应用状态')); }, ['export', 'export-schema', 'export-sync', 'export-sync-record'].includes(operation) ? 600000 : ['compare', 'plan-sync'].includes(operation) ? 180000 : 75000);
     pending.set(requestId, { resolve, reject, timer });
     native!.request(JSON.stringify({ requestId, operation, args }));
   });

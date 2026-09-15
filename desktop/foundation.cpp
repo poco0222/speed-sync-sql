@@ -103,6 +103,7 @@ QJsonObject probeDatabase(const QJsonObject &c) {
 }
 Foundation::Foundation(QString path, QObject *parent) : QObject(parent), directory(std::move(path)) {
     state = {{"connections", QJsonArray{}}, {"left", ""}, {"right", ""}, {"settings", QJsonObject{{"theme", "system"}, {"density", "standard"}, {"timeout", 10}}}};
+    recoverSyncRecords();
     QFile f(directory + "/connections.json");
     if (!f.exists()) return;
     if (!f.open(QIODevice::ReadOnly)) { loadError = "无法读取连接配置，请检查文件权限"; return; }
@@ -148,6 +149,8 @@ bool Foundation::persist(const QJsonObject &next, QString &error) {
 QJsonObject Foundation::execute(const QString &operation, const QJsonObject &args) {
     if (operation == "snapshot") return success({{"state", snapshot()}});
     if (!loadError.isEmpty()) return failure(loadError, "storage");
+    if (operation.contains("sync") || operation == "invalidate-plan") return syncOperation(operation, args);
+    if (syncExecuting && QStringList{"save", "delete", "select", "workspace", "settings", "cancel-schema"}.contains(operation)) return failure("结构执行中，请等待结束后修改上下文", "busy");
     auto next = state;
     QString error;
     if (operation == "save") {
@@ -308,7 +311,8 @@ void Foundation::request(const QString &json) {
     auto o = document.object(); auto id = o["requestId"].toString();
     if (id.isEmpty() || id.size() > 100) return;
     if (error.error != QJsonParseError::NoError || !o["args"].isObject()) { reply(id, failure("请求格式无效", "validation")); return; }
-    if (o["operation"] == "test") test(id, o["args"].toObject());
+    if (o["operation"] == "plan-sync") planSync(id, o["args"].toObject());
+    else if (o["operation"] == "test") test(id, o["args"].toObject());
     else if (o["operation"] == "schema" || o["operation"] == "compare") schemaTask(id, o["operation"].toString(), o["args"].toObject());
     else reply(id, execute(o["operation"].toString(), o["args"].toObject()));
 }
@@ -370,13 +374,14 @@ QString Foundation::workspaceKey() const {
     return state["left"].toString() + ":" + state["right"].toString();
 }
 void Foundation::invalidateSchema() {
-    ++schemaGeneration; comparison = {};
+    ++schemaGeneration; ++planGeneration; comparison = {}; syncPlan = {};
     for (auto it = jobs.cbegin(); it != jobs.cend(); ++it) if (it.key().startsWith("schema:")) {
         it.value()->setProperty("cancelled", true); it.value()->kill();
     }
 }
 void Foundation::schemaTask(const QString &id, const QString &operation, const QJsonObject &args) {
     if (!loadError.isEmpty()) { reply(id, failure(loadError, "storage")); return; }
+    if (syncExecuting || jobs.contains("sync")) { reply(id, failure("同步任务进行中", "busy")); return; }
     const bool comparing = operation == "compare";
     const auto side = args["side"].toString();
     if (!comparing && (side != "left" && side != "right")) { reply(id, failure("连接端无效", "validation")); return; }
@@ -404,7 +409,7 @@ void Foundation::schemaTask(const QString &id, const QString &operation, const Q
         // Catalog browsing must work even when the saved default database was removed.
         c["database"] = ""; payload[endpoint] = c;
     }
-    if (comparing) { ++schemaGeneration; comparison = {}; }
+    if (comparing) { ++schemaGeneration; ++planGeneration; comparison = {}; syncPlan = {}; }
     const auto generation = schemaGeneration;
     const auto lane = "schema:" + id;
     auto process = new QProcess(this); jobs[lane] = process;
@@ -430,4 +435,8 @@ void Foundation::schemaTask(const QString &id, const QString &operation, const Q
     process->setProgram(QCoreApplication::applicationFilePath()); process->setArguments({"--schema"});
     process->start(); timer->start(comparing ? 120000 : 65000); emit activityChanged();
 }
-void Foundation::stopJobs() { invalidateSchema(); for (auto process : jobs) process->kill(); }
+void Foundation::stopJobs() {
+    syncStop = true;
+    if (!syncExecuting) invalidateSchema();
+    for (auto it = jobs.cbegin(); it != jobs.cend(); ++it) if (it.key() != "sync" || !syncExecuting) it.value()->kill();
+}

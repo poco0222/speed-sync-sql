@@ -4,6 +4,7 @@
 #include <QHash>
 #include <QObject>
 #include <QProcess>
+#include <functional>
 
 QJsonObject probeDatabase(const QJsonObject &connection);
 QString validateConnection(const QJsonObject &connection);
@@ -29,8 +30,21 @@ private:
     QHash<QString, QString> passwords;
     QHash<QString, QProcess *> jobs;
     QHash<QString, int> revisions;
-    quint64 schemaGeneration = 0;
+    quint64 schemaGeneration = 0, planGeneration = 0;
     QJsonObject comparison;
+    QJsonObject syncPlan, syncRecord, syncPayload;
+    QJsonArray records;
+    bool syncExecuting = false, syncStop = false;
+    int syncStep = 0;
+    QJsonObject syncOperation(const QString &operation, const QJsonObject &args);
+    void planSync(const QString &id, const QJsonObject &args);
+    void runSyncProcess(const QJsonObject &payload, std::function<void(QJsonObject)> done, int timeout = 120000);
+    bool syncConnections(QJsonObject &payload, QString &error) const;
+    bool saveSyncRecord();
+    void recoverSyncRecords();
+    void advanceSync();
+    void finishSync(const QString &status, const QString &error = {});
+    void verifySync();
     QString workspaceKey() const;
     void invalidateSchema();
     void schemaTask(const QString &id, const QString &operation, const QJsonObject &args);

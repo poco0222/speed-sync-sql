@@ -1,5 +1,6 @@
 #include "foundation.h"
 #include "schema.h"
+#include "sync_process.h"
 #include <QApplication>
 #include <QCloseEvent>
 #include <QDir>
@@ -45,7 +46,7 @@ public:
         if (!bridge->busy()) { event->accept(); return; }
         event->ignore();
         if (closing) return;
-        QMessageBox question(QMessageBox::Question, "结束后台任务", "仍有连接测试或结构读取运行。结束任务并退出？", QMessageBox::Yes | QMessageBox::No, this);
+        QMessageBox question(QMessageBox::Question, "结束后台任务", "仍有后台任务运行。请求停止并退出？结构执行会等待当前语句结束，已发生的变更不会回滚。", QMessageBox::Yes | QMessageBox::No, this);
         question.button(QMessageBox::Yes)->setText("结束并退出");
         question.button(QMessageBox::No)->setText("继续运行");
         question.setDefaultButton(QMessageBox::No);
@@ -62,15 +63,16 @@ int main(int argc, char **argv) {
         QCoreApplication app(argc, argv);
         QCoreApplication::addLibraryPath(QCoreApplication::applicationDirPath() + "/plugins");
         QFile input; if (!input.open(stdin, QIODevice::ReadOnly)) return 1;
-        const auto bytes = input.read(32769);
+        const auto bytes = input.read(schema ? 16 * 1024 * 1024 + 1 : 32769);
         QJsonObject result;
         QJsonParseError error;
         const auto document = QJsonDocument::fromJson(bytes, &error);
-        if (bytes.size() > 32768 || error.error != QJsonParseError::NoError || !document.isObject()) result = {{"ok", false}, {"code", "validation"}, {"error", "请求格式无效"}};
+        if (bytes.size() > (schema ? 16 * 1024 * 1024 : 32768) || error.error != QJsonParseError::NoError || !document.isObject()) result = {{"ok", false}, {"code", "validation"}, {"error", "请求格式无效"}};
         else {
             auto worker = QThread::create([&]() {
                 if (probe) { result = probeDatabase(document.object()); return; }
                 auto input = document.object(); auto args = input["args"].toObject();
+                if (input["operation"].toString().contains("sync")) { result = runSyncCommand(input); return; }
                 if (input["operation"] == "compare") {
                     auto l = args["left"].toObject(); l["action"] = "snapshot";
                     auto r = args["right"].toObject(); r["action"] = "snapshot";

@@ -1,6 +1,6 @@
 # Speed Sync SQL
 
-Qt 6.10.2 + React 的 MySQL 桌面结构比对工具。D1 提供连接管理、系统凭据、主题/密度；D2 增加单表结构比对与差异摘要导出。结构同步和数据比对/同步留给后续阶段。
+Qt 6.10.2 + React 的 MySQL 桌面结构比对工具。D1 提供连接管理、系统凭据、主题/密度；D2 增加单表结构比对与差异摘要导出。D3 增加常规结构同步、SQL 预览、受控执行与记录；数据比对/同步留给后续阶段。
 
 目标：Windows 10 1809+ x64、macOS 15+ arm64。本机开发环境为 macOS 27 arm64；Windows 10/macOS 15 的运行验证尚未完成。不能把本机构建成功当作双平台验收通过。
 
@@ -77,6 +77,20 @@ JSON 导出包含完整对象状态与差异，不受当前筛选影响。摘要
 
 当前对明确的整表 SELECT/TRIGGER 授权证明元数据完整性；角色或复杂授权无法证明时保守提示受限。分区、未知特殊选项、仅大小写不同的歧义对象保持不支持，不猜测相同。实际数据库版本证据为本地 MySQL 8.0.46；其他版本不作未经验证的兼容承诺。
 
+## 结构同步（D3）
+
+完成比对后选择方向及对象，点击“预览选中对象 SQL”；“预览整表对齐”包含全部新增、修改与删除。首次不默认全选；相同索引和触发器可作为关联操作显式纳入。预览显示目标别名/库表、增改删数、逐对象语义、SQL 及风险，复制或导出后也不会自动执行。
+
+常规范围：普通字段与顺序、普通/唯一/主键/全文/空间索引、表注释/默认字符集/排序规则/行格式、基本触发器，以及确证缺表时建表。不同名配对保留目标名称。外键/CHECK、生成列、函数索引、分区、引擎转换及未知特性仅展示；相关依赖不明则阻止计划。触发器保留原 DEFINER、正文与上下文，同事件顺序不能可靠保持或非 UTF-8 客户端编码时仅展示。
+
+依赖完整性目前需要明确全局 SELECT 与目标库级 TRIGGER 可见性（实际变更另需相应 DDL 权限）；角色/复杂授权不能证明完整时保守阻止，不把不可见对象当不存在。不自动修改外部表，不关闭外键检查，不删除整表。
+
+确认一次摘要后，原生端重新核对两端结构并保存原始结构和初始记录，再按语句顺序执行。执行中锁定上下文，停止请求在当前语句结束后生效。DDL 不保证整体回滚；原结构不是业务数据备份。失败、未执行及结果待核实分别记录，断线/异常不自动重试。
+
+执行后重新比对；语句成功不等于两端全部一致。执行记录保存在应用数据目录的 `sync-records/`，可按时间/状态/连接过滤、查看原结构与步骤、导出 JSON。重启将未完成执行标待核实；历史记录仅能恢复工作台选择，不可直接重放。
+
+本机验证使用独立临时 MySQL 8.0.46 和真实 Qt WebEngine，不接现有数据库。验证细节见 [D3 验证记录](docs/development/d3-validation.md)。
+
 ## 检查命令
 
 ```sh
@@ -108,3 +122,13 @@ SPEED_SYNC_SMOKE_REPORT="$PWD/.local/evidence/desktop-smoke.json" \
 ```
 
 生成本地 JSON 和截图后退出。正常启动不设置这些变量。实际检查与限制见 [D1 检查记录](docs/development/d1-validation.md)，完整规格见 [desktop-foundation](docs/comet/specs/desktop-foundation/spec.md)。
+
+D3 完整隔离集成检查：
+
+```sh
+python3 tests/integration_sync.py \
+  --mysql-home /Users/PopoY/Documents/DevTools/mysql/current \
+  --app build/speed-sync-sql.app/Contents/MacOS/speed-sync-sql \
+  --output .local/evidence/d3-integration.json \
+  --desktop-script tests/desktop_sync.mjs
+```

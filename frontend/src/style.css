@@ -80,3 +80,8 @@ footer { min-height: 33px; border-top: 1px solid var(--line); display: flex; pad
 .definition .ant-typography { font-size: 11px; overflow-wrap: anywhere; }
 @media (max-width: 1050px) { .schema-workbench { margin: 16px; } .schema-results { padding: 12px; } .schema-navigation { padding: 12px; } .definition-pair { grid-template-columns: 1fr; } }
 @media (max-width: 750px) { .schema-layout { grid-template-columns: minmax(0, 1fr) !important; } .schema-navigation { border-right: 0; border-bottom: 1px solid var(--line); } .pair-context { grid-template-columns: 1fr; gap: 12px; } }
+
+.sync-panel { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border, #d9d9d9); display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.sync-sql { margin: 0; padding: 12px; max-height: 360px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; background: rgba(128, 128, 128, .07); border-radius: 4px; }
+@media (max-width: 900px) { .sync-panel .definition-heading { flex-direction: column; align-items: flex-start; } }
+.sync-operations { max-height: 240px; overflow: auto; padding-left: 24px; margin: 8px 0; overflow-wrap: anywhere; }

@@ -100,8 +100,10 @@ QJsonObject queryCategory(QSqlDatabase &db, const QString &sql, const QStringLis
 }
 // Only explicit whole-object grants prove that INFORMATION_SCHEMA did not hide rows.
 // Role grants and wildcard scopes remain conservative, including partial revokes.
-bool hasPrivilege(const QStringList &grants, const QString &privilege, const QString &database, const QString &table) {
-    const QStringList scopes{"*.*", quoted(database) + ".*", quoted(database) + "." + quoted(table)};
+bool hasPrivilege(const QStringList &grants, const QString &privilege, const QString &database, const QString &table, int scopeDepth = 2) {
+    QStringList scopes{"*.*"};
+    if (scopeDepth >= 1) scopes.append(quoted(database) + ".*");
+    if (scopeDepth >= 2) scopes.append(quoted(database) + "." + quoted(table));
     for (const auto &grant : grants) if (grant.startsWith("REVOKE ")) return false;
     for (const auto &grant : grants) {
         auto match = QRegularExpression("^GRANT (.+) ON (.+) TO ").match(grant);
@@ -137,6 +139,19 @@ QJsonObject readConnected(QSqlDatabase &db, const QJsonObject &args) {
     QStringList grants;
     if (q.exec("SHOW GRANTS FOR CURRENT_USER")) while (q.next()) grants.append(q.value(0).toString());
     const bool fullSelect = hasPrivilege(grants, "SELECT", database, table), fullTrigger = hasPrivilege(grants, "TRIGGER", database, table);
+    if (args["sync"].toBool()) {
+        result["sqlMode"] = sqlMode;
+        if (!q.exec("SELECT @@server_uuid") || !q.next()) return failure("无法确认服务器身份");
+        result["serverUuid"] = q.value(0).toString();
+        q.prepare("SELECT DEFAULT_COLLATION_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME=?"); q.addBindValue(database);
+        if (!q.exec() || !q.next()) return failure("无法读取数据库排序上下文");
+        result["databaseCollation"] = q.value(0).toString();
+        const bool globalSelect = hasPrivilege(grants, "SELECT", {}, {}, 0);
+        const bool databaseTrigger = hasPrivilege(grants, "TRIGGER", database, {}, 1);
+        auto incoming = queryCategory(db, "SELECT CONSTRAINT_NAME AS name, TABLE_SCHEMA AS databaseName, TABLE_NAME AS tableName, COLUMN_NAME AS columnName, REFERENCED_COLUMN_NAME AS referencedColumn FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE REFERENCED_TABLE_SCHEMA=? AND REFERENCED_TABLE_NAME=? ORDER BY TABLE_SCHEMA,TABLE_NAME,CONSTRAINT_NAME,ORDINAL_POSITION", {database, table}, "name");
+        auto names = queryCategory(db, "SELECT TRIGGER_NAME AS name, EVENT_OBJECT_TABLE AS tableName FROM INFORMATION_SCHEMA.TRIGGERS WHERE TRIGGER_SCHEMA=? ORDER BY TRIGGER_NAME", {database}, "name");
+        result["syncGuard"] = QJsonObject{{"complete", globalSelect && databaseTrigger && incoming["state"] == "complete" && names["state"] == "complete"}, {"incoming", incoming["items"]}, {"triggerNames", names["items"]}};
+    }
     const auto show = "SHOW CREATE TABLE " + quoted(database) + "." + quoted(table);
     if (!q.exec(show) || !q.next()) {
         auto code = q.lastError().nativeErrorCode().toInt();
