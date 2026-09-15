@@ -1,0 +1,195 @@
+schema: comet.native.v4
+name: mysql-schema-sync
+language: zh-CN
+phase: archive
+status: done
+state_version: 11
+brief: brief.md
+shape_confirmation_hash: 039d8154dc8da06a10effaec947bc5fb618c9f10876cd4a922938d505d9ffe18
+spec_changes:
+  - capability: product-planning
+    operation: create
+    source: specs/product-planning/spec.md
+workspace:
+  isolation: current
+  change_branch: null
+  target_branch: null
+  finish: null
+loop:
+  stage: done
+  goal_cycle: 2
+  iteration: 1
+  attempt: 1
+  retry_epoch: 0
+  failed_iteration_count: 0
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: null
+acceptance:
+  - id: A1
+    source: brief.md
+    text: A1：可行性结论区分已核实的技术事实、产品建议、待验证边界；不把依赖声明当作运行验证。
+    result: passed
+    reason:
+      text: feasibility.md distinguishes official capabilities, prior Registry facts,
+        recommendations and unverified runtime boundaries.
+      truncated: false
+  - id: A2
+    source: brief.md
+    text: A2：设计明确覆盖连接、单表选择、对象差异、方向选择、SQL 预览、执行结果及重新比对。
+    result: passed
+    reason:
+      text: overview.md and interaction-design.md cover connections, tables, object
+        differences, direction, SQL preview, results and recomparison.
+      truncated: false
+  - id: A3
+    source: brief.md
+    text: A3：交互设计覆盖无连接、加载、空结果、单端缺表、无差异、读取失败、执行部分失败状态。
+    result: passed
+    reason:
+      text: interaction-design.md states cover disconnected, loading, absent table,
+        equal, search-empty, range-empty, read failure, partial failure and
+        unknown result with recovery actions.
+      truncated: false
+  - id: A4
+    source: brief.md
+    text: A4：页面方案以 Ant Design 组件为主，差异文本可扫读，写入端始终明确，不使用营销页装饰替代工具功能。
+    result: passed
+    reason:
+      text: Selected layout B, aligned grouped columns, visible write side, semantic
+        differences and Ant Design mapping are explicit; wireframes are not
+        presented as implemented UI.
+      truncated: false
+  - id: A5
+    source: brief.md
+    text: A5：总体功能清单包含表数据同步的建议模式、适用条件和边界，并与结构同步区分。
+    result: passed
+    reason:
+      text: overview.md separates three data sync modes with reliable keys,
+        compatibility, complete scanning, scope conflicts, precision,
+        concurrency and batch commit boundaries.
+      truncated: false
+  - id: A6
+    source: brief.md
+    text: A6：交付明确列出后续独立开发 change 的建议范围、依赖和阶段目标；本次没有业务实现或依赖安装。
+    result: passed
+    reason:
+      text: roadmap.md defines D1-D7 independent future changes. Actual file inventory
+        contains documents and workflow helpers, not product scaffold. Runtime
+        documentation-integrity passed exit0 in31ms.
+      truncated: false
+builder_handoff:
+  candidate_id: 2d04dc26-90a3-4e80-9342-ed18ceb44472
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:0d4414fc-afa5-4f6a-bc53-b063fefaa899
+  iteration: 1
+  summary:
+    text: Completed the confirmed product planning documents and layout B, with no
+      business implementation. Independent review found and verified a fix for
+      empty-result states.
+    truncated: false
+  addressed_acceptance_ids:
+    - A1
+    - A2
+    - A3
+    - A4
+    - A5
+    - A6
+  checks:
+    - name:
+        text: documentation-integrity
+        truncated: false
+      result: not-run
+      note:
+        text: Current candidate will be checked by Runtime using the temporary
+          standard-library validation script.
+        truncated: false
+  checks_truncated: false
+  known_limits:
+    - text: Documentation and wireframes only; no high-fidelity screenshots, builds,
+        databases, performance or platform runtime verification.
+      truncated: false
+  known_limits_truncated: false
+  review:
+    status: passed
+    summary:
+      text: All A1-A6 planning coverage reviewed. Added distinct search-empty and
+        data-range-empty states; focused follow-up passed with no necessary
+        findings.
+      truncated: false
+    reviewer_execution_ref: /root/planning_review
+  submitted_at: 2026-09-15T04:48:38.703Z
+blockers: []
+verification:
+  candidate_id: 2d04dc26-90a3-4e80-9342-ed18ceb44472
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:0ba3d568-da61-4c4f-a611-bab59d124906
+  iteration: 1
+  attempt: 1
+  assurance: skill-coordinated
+  verdict: pass
+  checks:
+    - id: documentation-integrity
+      name:
+        text: documentation-integrity
+        truncated: false
+      argv_display:
+        - text: /tmp/speed-sync-planning-check-20260915.py
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 31
+  summary:
+    text: Independent verifier /root/planning_verifier passed all A1-A6 after
+      reading formal requirements, all design documents, file inventory and
+      Runtime evidence. No blocking findings.
+    truncated: false
+  risks:
+    - text: Planning and wireframe verification only. No builds, database execution,
+        performance or Windows/macOS package validation.
+      truncated: false
+    - text: Current Runtime evidence reused; no repeated online verification of prior
+        documentation/Registry retrieval.
+      truncated: false
+    - text: Directory is not a Git repository; no Git diff or historical proof.
+      truncated: false
+  risks_truncated: false
+  completed_at: 2026-09-15T04:52:03.619Z
+history:
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 0
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Native Shape artifacts changed
+      truncated: false
+    completed_at: 2026-09-15T04:48:20.259Z
+  - goal_cycle: 2
+    iteration: 1
+    attempt: 1
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: Independent verifier /root/planning_verifier passed all A1-A6 after
+        reading formal requirements, all design documents, file inventory and
+        Runtime evidence. No blocking findings.
+      truncated: false
+    completed_at: 2026-09-15T04:52:03.619Z
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pass
+verification_report: verification.md
+archived: true
+created_at: 2026-09-15T04:20:07.721Z

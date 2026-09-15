@@ -1,0 +1,93 @@
+#include "foundation.h"
+#include "credentials.h"
+#include <QFile>
+#include <QTemporaryDir>
+#include <QTest>
+#include <QSignalSpy>
+#include <QJsonDocument>
+#include <QScopeGuard>
+class FoundationTest : public QObject {
+    Q_OBJECT
+    QJsonObject connection() { return {{"name", "本地测试"}, {"host", "127.0.0.1"}, {"port", 3306}, {"user", "test"}, {"password", "test-secret-NEVER-PERSIST"}, {"database", ""}, {"tls", "preferred"}, {"ca", ""}, {"remember", false}, {"timeout", QJsonValue::Null}}; }
+private slots:
+    void configLifecycle() {
+        QTemporaryDir dir;
+        Foundation service(dir.path());
+        auto saved = service.execute("save", connection()); QVERIFY(saved["ok"].toBool());
+        auto id = saved["id"].toString(); QVERIFY(!id.isEmpty());
+        QVERIFY(service.execute("select", {{"side", "left"}, {"id", id}})["ok"].toBool());
+        QVERIFY(service.execute("select", {{"side", "right"}, {"id", id}})["ok"].toBool());
+        QFile file(dir.filePath("connections.json")); QVERIFY(file.open(QIODevice::ReadOnly));
+        auto bytes = file.readAll(); QVERIFY(!bytes.contains("test-secret")); QVERIFY(!bytes.contains("password"));
+        Foundation restarted(dir.path()); QCOMPARE(restarted.snapshot()["left"].toString(), id);
+        auto edit = connection(); edit["id"] = id; edit["name"] = "重命名"; edit.remove("password");
+        QVERIFY(service.execute("save", edit)["ok"].toBool());
+        auto clone = connection(); clone.remove("id"); auto copied = service.execute("save", clone); QVERIFY(copied["id"] != id);
+        QVERIFY(service.execute("delete", {{"id", id}})["ok"].toBool());
+        QCOMPARE(service.snapshot()["left"].toString(), QString()); QCOMPARE(service.snapshot()["right"].toString(), QString());
+        QVERIFY(!service.execute("save", edit)["ok"].toBool());
+    }
+    void invalidInputAndCorruption() {
+        QTemporaryDir dir; Foundation service(dir.path()); auto c = connection();
+        for (double port : {0.0, 65536.0, 1.5}) { c["port"] = port; QVERIFY(!service.execute("save", c)["ok"].toBool()); }
+        c = connection(); c["ca"] = "ca.pem;MYSQL_OPT_SSL_MODE=DISABLED"; QVERIFY(!validateConnection(c).isEmpty());
+        c = connection(); c["timeout"] = 0; QVERIFY(!validateConnection(c).isEmpty());
+        QVERIFY(!service.execute("settings", {{"theme", "invalid"}})["ok"].toBool());
+        QFile file(dir.filePath("connections.json")); QVERIFY(file.open(QIODevice::WriteOnly)); file.write("broken"); file.close();
+        Foundation damaged(dir.path()); QVERIFY(!damaged.snapshot()["loadError"].toString().isEmpty());
+        QVERIFY(!damaged.execute("save", connection())["ok"].toBool());
+        QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.readAll(), QByteArray("broken"));
+    }
+    void storageFailure() {
+        QTemporaryDir dir; QFile file(dir.filePath("not-a-directory")); QVERIFY(file.open(QIODevice::WriteOnly)); file.close();
+        Foundation service(file.fileName()); QVERIFY(!service.execute("save", connection())["ok"].toBool());
+    }
+    void errorClassification() {
+        QCOMPARE(classifyDatabaseError(1045)["code"].toString(), QString("authentication"));
+        QCOMPARE(classifyDatabaseError(1049)["code"].toString(), QString("database"));
+        QCOMPARE(classifyDatabaseError(2003)["code"].toString(), QString("network"));
+        QCOMPARE(classifyDatabaseError(2026)["code"].toString(), QString("tls"));
+        QCOMPARE(classifyDatabaseError(9999)["code"].toString(), QString("connection"));
+    }
+    void bridgeBoundary() {
+        QTemporaryDir dir; Foundation service(dir.path()); QSignalSpy spy(&service, &Foundation::response);
+        service.request("{\"requestId\":\"r1\",\"operation\":\"unknown\",\"args\":{}}");
+        QCOMPARE(spy.size(), 1); auto reply = QJsonDocument::fromJson(spy.takeFirst().at(0).toString().toUtf8()).object();
+        QVERIFY(!reply["ok"].toBool()); QCOMPARE(reply["requestId"].toString(), QString("r1"));
+    }
+    void platformCredentials() {
+        if (!qEnvironmentVariableIsSet("SPEED_SYNC_TEST_CREDENTIALS")) QSKIP("Set SPEED_SYNC_TEST_CREDENTIALS=1 for isolated system-credential lifecycle check");
+        QTemporaryDir dir; Foundation service(dir.path()); auto c = connection(); c["remember"] = true;
+        auto saved = service.execute("save", c); QVERIFY2(saved["ok"].toBool(), qPrintable(saved["error"].toString()));
+        auto id = saved["id"].toString(); QString error;
+        const auto cleanup = qScopeGuard([&] { QString ignored; Credentials::remove(service.credentialKey(id), ignored); });
+        auto value = Credentials::read(service.credentialKey(id), error); QVERIFY(error.isEmpty()); QVERIFY(value == c["password"].toString());
+        c["id"] = id; c["remember"] = false; c.remove("password");
+        QVERIFY(service.execute("save", c)["ok"].toBool());
+        Credentials::read(service.credentialKey(id), error); QVERIFY(!error.isEmpty());
+    }
+    void credentialRollbackAndMissing() {
+        if (!qEnvironmentVariableIsSet("SPEED_SYNC_TEST_CREDENTIALS")) QSKIP("System credentials opt-in");
+        QTemporaryDir dir; Foundation service(dir.path()); auto c = connection(); c["remember"] = true;
+        auto saved = service.execute("save", c); QVERIFY(saved["ok"].toBool());
+        auto id = saved["id"].toString(); auto key = service.credentialKey(id);
+        const auto cleanup = qScopeGuard([&] { QString ignored; Credentials::remove(key, ignored); });
+        const QString filename = dir.filePath("connections.json");
+        QVERIFY(QFile::remove(filename)); QVERIFY(QDir().mkdir(filename));
+        auto edit = c; edit["id"] = id; edit["password"] = "replacement-fixture-secret";
+        QVERIFY(!service.execute("save", edit)["ok"].toBool());
+        QString error; auto restored = Credentials::read(key, error);
+        QVERIFY(error.isEmpty()); QVERIFY(restored == c["password"].toString());
+        QVERIFY(QDir().rmdir(filename));
+        QVERIFY(Credentials::remove(key, error));
+        bool missing = false; Credentials::read(key, error, &missing); QVERIFY(missing);
+        QVERIFY(service.execute("delete", {{"id", id}})["ok"].toBool());
+        saved = service.execute("save", c); QVERIFY(saved["ok"].toBool());
+        id = saved["id"].toString(); key = service.credentialKey(id); error.clear();
+        QVERIFY(Credentials::remove(key, error));
+        edit = c; edit["id"] = id; edit["remember"] = false; edit.remove("password");
+        QVERIFY(service.execute("save", edit)["ok"].toBool());
+    }
+};
+QTEST_MAIN(FoundationTest)
+#include "foundation_test.moc"

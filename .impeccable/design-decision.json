@@ -1,0 +1,65 @@
+{
+  "title": "Speed Sync SQL · 页面布局方案",
+  "question": "本次仅交付产品规划与设计。总体文档已写入 docs/design。以下是区域线框，不是产品截图；推荐 B，结构与数据共用左右对照。",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "A · 变更清单工作台",
+      "thesis": "按新增、修改、删除组织工作，每项展开左右值。",
+      "palette": ["#F5F7FA", "#FFFFFF", "#1F2329", "#1677FF"],
+      "materials": ["Ant Design 标准组件", "中性表面与清晰分隔"],
+      "viewport": "顶部连接，左侧表列表，中间变更清单，右侧常驻计划。",
+      "risk": "执行检查集中，但看整体字段顺序需要展开。",
+      "raised": [
+        {"from": "依赖图", "raise": "关联操作可追溯。"},
+        {"from": "折叠通道", "raise": "展开详情保留原对象位置。"},
+        {"from": "消费型表单", "raise": "按钮直接说明动作。"},
+        {"from": "固定标尺", "raise": "两端值按同一字段对齐。"},
+        {"from": "状态叠层", "raise": "过期计划明确标识。"},
+        {"from": "日志界面", "raise": "失败可定位到具体步骤。"}
+      ],
+      "wireframe": {"cols": 12, "rows": 10, "regions": [
+        {"label": "连接与方向", "x": 0, "y": 0, "w": 12, "h": 2},
+        {"label": "表列表", "x": 0, "y": 2, "w": 2, "h": 8},
+        {"label": "变更清单 / 展开左右值", "x": 2, "y": 2, "w": 7, "h": 8, "accent": true},
+        {"label": "计划", "x": 9, "y": 2, "w": 3, "h": 8}
+      ]}
+    },
+    {
+      "id": "model-pick",
+      "label": "B · 对照工作台（推荐）",
+      "kicker": "产品推荐",
+      "thesis": "左右值持续对齐，选中的差异汇成可展开计划。",
+      "palette": ["#F5F7FA", "#FFFFFF", "#1F2329", "#1677FF"],
+      "materials": ["Ant Design 标准组件", "中性表面与清晰分隔"],
+      "viewport": "顶部连接，左侧表列表，主区左右比对，底部按需打开 SQL 与执行结果。",
+      "risk": "布局熟悉；品质依靠密度、排版与状态细节。",
+      "wireframe": {"cols": 12, "rows": 10, "regions": [
+        {"label": "连接与方向", "x": 0, "y": 0, "w": 12, "h": 2},
+        {"label": "表列表", "x": 0, "y": 2, "w": 2, "h": 8},
+        {"label": "分类与筛选", "x": 2, "y": 2, "w": 10, "h": 1},
+        {"label": "左侧值", "x": 2, "y": 3, "w": 5, "h": 5, "accent": true},
+        {"label": "右侧值 / 写入端", "x": 7, "y": 3, "w": 5, "h": 5, "accent": true},
+        {"label": "选区与预览（按需展开）", "x": 2, "y": 8, "w": 10, "h": 2}
+      ]}
+    },
+    {"id":"dependency","label":"依赖图","verdict":"declined","thesis":"用网络串联变更依赖。","palette":["#F5F7FA","#1F2329","#1677FF"],"materials":["节点网络"],"viewport":"按对象关联展开。","risk":"大量字段难以连续扫读。","case":"不如表格符合数据库用户习惯，也不利于精确值对照。","kept":"关联操作可追溯。"},
+    {"id":"fold","label":"折叠通道","verdict":"declined","thesis":"按对象逐项展开。","palette":["#F5F7FA","#1F2329","#1677FF"],"materials":["连续折叠区"],"viewport":"一项一个展开区域。","risk":"多项比较需要反复展开。","case":"隐藏连续结构，也增加操作次数。","kept":"展开保留上下文。"},
+    {"id":"consumer","label":"消费型卡片","verdict":"declined","thesis":"宽松卡片承载每个对象。","palette":["#F5F7FA","#1F2329","#1677FF"],"materials":["大卡片"],"viewport":"单列宽松内容。","risk":"密度不足。","case":"不适合单表大量字段与记录。","kept":"按钮直说动作。"},
+    {"id":"folio","label":"固定标尺图鉴","verdict":"declined","thesis":"同尺度展示多个状态。","palette":["#F5F7FA","#1F2329","#1677FF"],"materials":["固定标尺"],"viewport":"沿共同基线比较。","risk":"图鉴语汇引入无关装饰。","case":"保留对齐即可，不需要图鉴形式。","kept":"两端严格对齐。"},
+    {"id":"ghost","label":"状态叠层","verdict":"declined","thesis":"叠放新旧状态。","palette":["#F5F7FA","#1F2329","#1677FF"],"materials":["叠层数值"],"viewport":"新旧文字重叠。","risk":"难以精确读取。","case":"与可读表格及标准控件约束不符。","kept":"过期状态明显。"},
+    {"id":"terminal","label":"终端日志","verdict":"declined","thesis":"按执行顺序记录结果。","palette":["#F5F7FA","#1F2329","#1677FF"],"materials":["连续文本"],"viewport":"命令与记录为主体。","risk":"操作过度依赖文本。","case":"不满足友好表单与直接对照。","kept":"失败定位到步骤。"}
+  ],
+  "reroll": {"registers": ["safer", "bolder"]},
+  "steer": true,
+  "canon": true,
+  "canonCard": {
+    "label": "标准数据库管理器布局",
+    "thesis": "数据库树、多个对象标签与独立 SQL 窗口。",
+    "palette": ["#F5F7FA", "#FFFFFF", "#1F2329", "#1677FF"],
+    "materials": ["Ant Design"],
+    "viewport": "左侧完整数据库树，右侧多标签内容。",
+    "risk": "单表快速同步可能被通用管理器功能淹没。"
+  },
+  "buildPath": {"value": "code", "toggle": false}
+}

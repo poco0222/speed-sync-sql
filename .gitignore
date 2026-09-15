@@ -1,0 +1,48 @@
+# >>> Comet managed project state >>>
+!/.comet/
+/.comet/*
+!/.comet/config.yaml
+# <<< Comet managed project state <<<
+
+# Local data and tooling state
+/.local/
+/.codegraph/
+/.impeccable/build/
+/.impeccable/questions/
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# CMake / Qt build output and user settings
+/build/
+/build-*/
+/cmake-build-*/
+CMakeUserPresets.json
+*.user
+*.user.*
+
+# Frontend dependencies and generated output
+node_modules/
+/frontend/dist/
+*.tsbuildinfo
+coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Python probe cache
+__pycache__/
+*.py[cod]
+.venv/
+
+# OS and editor state
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
+.idea/
+.vs/
+*.swp
+*.swo
