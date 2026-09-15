@@ -82,6 +82,10 @@ try {
   const detail = await evaluate(`document.querySelector('.ant-drawer-body').innerText`);
   assert(detail.includes('数据补齐')&&detail.includes('已提交')&&!detail.includes('INSERT INTO'),detail);
   checks.push('real durable data record exposes batch results without replayable row SQL');
+  if(args['--align']==='true') {
+    const {checkAlignmentUi}=await import('./desktop_align.mjs');
+    await checkAlignmentUi({command,evaluate,waitFor,button,pause,checks,output});
+  }
   await command('Page.reload');
   await waitFor(`document.querySelector('#left-table')?.value==='ui_sample'`);
   await evaluate(`[...document.querySelectorAll('[role=menuitem]')].find(e=>e.innerText==='执行记录').click()`);
@@ -141,6 +145,10 @@ try {
   const saved=await request('sync-record',{id:stopped.id});assert(saved.ok&&saved.record.status==='stopped',JSON.stringify(saved));
   assert(!JSON.stringify(saved.record).includes('password'));
   checks.push('stopped record persisted with committed and unexecuted counts');
+  if(args['--align']==='true') {
+    const {checkAlignmentBridge}=await import('./desktop_align.mjs');
+    await checkAlignmentBridge({request,scan,complete,checks,evaluate,waitFor,command});
+  }
   await writeFile(output,JSON.stringify({result:'passed',surface:'real Qt WebEngine with isolated MySQL',checks},null,2)+'\n');
   console.log(`${checks.length} real D5 desktop checks passed`);
 } catch(error) {

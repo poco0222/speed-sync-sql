@@ -1,6 +1,6 @@
 # Speed Sync SQL
 
-Qt 6.10.2 + React 的 MySQL 桌面结构比对工具。D1 提供连接管理、系统凭据、主题/密度；D2 增加单表结构比对与差异摘要导出。D3 增加常规结构同步、SQL 预览、受控执行与记录；D4 增加只读数据比对；D5 增加受控的数据补齐与合并更新。
+Qt 6.10.2 + React 的 MySQL 桌面结构比对工具。D1 提供连接管理、系统凭据、主题/密度；D2 增加单表结构比对与差异摘要导出。D3 增加常规结构同步、SQL 预览、受控执行与记录；D4 增加只读数据比对；D5 增加受控的数据补齐与合并更新；D6 增加范围内完全对齐及独立删除确认。
 
 目标：Windows 10 1809+ x64、macOS 15+ arm64。本机开发环境为 macOS 27 arm64；Windows 10/macOS 15 的运行验证尚未完成。不能把本机构建成功当作双平台验收通过。
 
@@ -179,3 +179,24 @@ python3 tests/integration_merge.py \
 ```
 
 测试仅使用脚本创建的临时 MySQL；含真实 Qt WebEngine 交互。实际证据及未验证平台见 [D5 验证记录](docs/development/d5-validation.md)。
+
+## 完全对齐（D6）
+
+完成可靠键的完整数据比对后，显式选择“完全对齐”。计划在共享筛选范围内新增、更新选定差异字段，并删除目标独有整行；范围外记录保留。无筛选条件表示全表，空源完整扫描可能产生范围内全部删除。页面搜索、分类和分页不缩小实际执行范围。
+
+预览显示增改删数、SQL、范围与读取时间；“仅删除”分类可单独检查删除明细。存在删除时先勾选确认数量、范围与整行删除含义，再作执行摘要确认。新计划清除旧确认，后端拒绝未确认、过期及重复执行。
+
+DELETE 前在同批事务中锁定可靠键并核对完整目标旧值；值已改、已删或移出范围即冲突。扫描后新增的目标键不自动加入删除，源后续变化不加入旧计划。范围外同键按目标数据库真实键语义报冲突。外键保持启用：RESTRICT/NO ACTION 引用冲突使本批回滚；CASCADE、SET NULL 或未知删除规则阻止自动删除。无法证明副作用边界的触发器同样阻止执行。
+
+沿用 D5 分批提交、停止、未知结果与记录规则；不提供整体回滚。执行记录显示完全对齐模式和删除计数；重新比对独立确认范围内当前差异，不把执行成功当作持续一致。
+
+D6 使用同一隔离测试入口，包含 D5 回归及真实 Qt 检查：
+
+```sh
+python3 tests/integration_merge.py --align \
+  --mysql-home /Users/PopoY/Documents/DevTools/mysql/current \
+  --app build/speed-sync-sql.app/Contents/MacOS/speed-sync-sql \
+  --output .local/evidence/d6-integration.json
+```
+
+实际证据与未验证项见 [D6 验证记录](docs/development/d6-validation.md)。测试仅使用自行创建的临时 MySQL。

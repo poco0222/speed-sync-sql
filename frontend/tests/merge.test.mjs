@@ -17,3 +17,9 @@ test('data records need batches and never require DDL steps',()=>{
  assert.equal(isMergeRecord(null),false);
  assert.equal(mergeSummary({counts:{add:2,modify:3,delete:0}}),'新增 2 · 更新 3 · 删除 0');
 });
+
+test('alignment record and destructive count remain visible',()=>{
+ const record={id:'r',mode:'data-align',startedAt:'now',status:'unknown',left:{},right:{},batches:[],committed:256,total:600};
+ assert.equal(isMergeRecord(record),true);
+ assert.equal(mergeSummary({counts:{add:1,modify:2,delete:600}}),'新增 1 · 更新 2 · 删除 600');
+});

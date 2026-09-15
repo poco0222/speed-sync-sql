@@ -1,0 +1,111 @@
+import assert from 'node:assert/strict';
+import {writeFile} from 'node:fs/promises';
+import {join,dirname} from 'node:path';
+
+export async function checkAlignmentUi({command,evaluate,waitFor,button,pause,checks,output}) {
+ await command('Page.reload');
+ await waitFor(`document.querySelector('#left-table')?.value==='ui_sample'`);
+ await evaluate(`[...document.querySelectorAll('[role=tab]')].find(t=>t.innerText.includes('数据比对')).click()`);
+ await waitFor(`!!document.querySelector('.data-workbench')`);
+ await button('读取键与字段');
+ await waitFor(`[...document.querySelectorAll('button')].some(b=>b.innerText.replace(/\\s/g,'')==='开始数据比对'&&!b.disabled)`);
+ await button('开始数据比对');
+ await waitFor(`[...document.querySelectorAll('button')].some(b=>b.innerText.replace(/\\s/g,'')==='预览数据写入'&&!b.disabled)`);
+ const select=async(label,text)=>{
+  await evaluate(`document.querySelector('[aria-label="${label}"]').closest('.ant-select').scrollIntoView({block:'center'})`);
+  await waitFor(`(()=>{const e=document.querySelector('[aria-label="${label}"]').closest('.ant-select');const r=e.getBoundingClientRect();return !e.classList.contains('ant-select-disabled')&&r.width>0&&r.height>0&&e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));})()`);
+  const point=await evaluate(`(()=>{const e=document.querySelector('[aria-label="${label}"]').closest('.ant-select');const r=e.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()`);
+  await command('Input.dispatchMouseEvent',{type:'mousePressed',...point,button:'left',clickCount:1});
+  await command('Input.dispatchMouseEvent',{type:'mouseReleased',...point,button:'left',clickCount:1});
+  await waitFor(`[...document.querySelectorAll('.ant-select-item-option-content')].some(e=>e.innerText===${JSON.stringify(text)}&&e.getBoundingClientRect().height>0)`);
+  await pause(200);
+  await evaluate(`[...document.querySelectorAll('.ant-select-item-option-content')].find(e=>e.innerText===${JSON.stringify(text)}&&e.getBoundingClientRect().height>0).click()`);
+  await waitFor(`document.querySelector('[aria-label="${label}"]').closest('.ant-select').textContent.includes(${JSON.stringify(text)})`);
+ };
+ await select('数据写入模式','完全对齐');
+ await button('预览数据写入');
+ await waitFor(`document.querySelector('.data-workbench .sync-panel')?.innerText.includes('DELETE FROM')`);
+ const text=await evaluate(`document.querySelector('.data-workbench .sync-panel').innerText`);
+ assert(text.includes('更新 1 · 删除 1')&&text.includes('全表')&&text.includes('未参与比较的列'),text);
+ const disabled=`[...document.querySelectorAll('button')].find(b=>b.innerText.replace(/\\s/g,'')==='执行数据写入')?.disabled`;
+ assert.equal(await evaluate(disabled),true);
+ await select('操作预览分类','仅删除（1）');
+ await waitFor(`document.querySelector('.data-workbench .sync-panel .ant-table-wrapper').querySelectorAll('tbody tr[data-row-key]').length===1&&document.querySelector('.data-workbench .sync-panel tbody')?.innerText.includes('删除整行')`);
+ assert.equal(await evaluate(`document.querySelector('.data-workbench .sync-panel .ant-table-wrapper').querySelectorAll('tbody tr[data-row-key]').length`),1);
+ await evaluate(`document.querySelector('.data-workbench .sync-panel input[type=checkbox]').click()`);
+ await waitFor(`!(${disabled})`);
+ await button('预览数据写入');
+ await waitFor(`document.querySelector('.data-workbench .sync-panel')?.innerText.includes('DELETE FROM')`);
+ assert.equal(await evaluate(disabled),true,'New plan retained old delete confirmation');
+ checks.push('D6 real Qt delete-only preview; destructive confirmation required and reset on new plan');
+ for(const [width,height] of [[1440,900],[1024,800]]) {
+  await command('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
+  const bounds=await evaluate(`(()=>{const e=document.querySelector('.data-workbench .sync-panel input[type=checkbox]').closest('label');const r=e.getBoundingClientRect();return {x:r.x,right:r.right,y:r.y,bottom:r.bottom};})()`);
+  assert(bounds.x>=0&&bounds.right<=width&&bounds.y>=0&&bounds.bottom<=height,JSON.stringify(bounds));
+  await pause(150);
+  const shot=await command('Page.captureScreenshot',{format:'png'});
+  await writeFile(join(dirname(output),`d6-delete-${width}.png`),Buffer.from(shot.data,'base64'));
+ }
+ await evaluate(`document.querySelector('.data-workbench .sync-panel input[type=checkbox]').click()`);
+ await waitFor(`!(${disabled})`);
+ await button('执行数据写入');
+ await waitFor(`!!document.querySelector('.ant-modal-confirm')`);
+ const summary=await evaluate(`document.querySelector('.ant-modal-confirm').innerText`);
+ assert(summary.includes('已确认删除 1 条整行')&&summary.includes('d5_right.ui_sample')&&summary.includes('全表'),summary);
+ await button('确认执行');
+ await waitFor(`document.querySelector('.data-workbench .sync-panel')?.innerText.includes('成功 · 已确认提交 2 / 2')`);
+ await button('按当前上下文重新比对');
+ await waitFor(`[...document.querySelectorAll('button')].some(b=>b.innerText.replace(/\\s/g,'')==='预览数据写入'&&!b.disabled)`);
+ await button('预览数据写入');
+ await waitFor(`document.querySelector('.data-workbench .sync-panel')?.innerText.includes('无可执行变更')`);
+ checks.push('D6 real Qt explicit delete and summary confirmation; committed then independently rescanned to zero operations');
+ await evaluate(`[...document.querySelectorAll('[role=menuitem]')].find(e=>e.innerText==='执行记录').click()`);
+ await waitFor(`document.body.innerText.includes('数据完全对齐')`);
+ await evaluate(`[...document.querySelectorAll('tr')].find(e=>e.innerText.includes('数据完全对齐')).querySelector('button').click()`);
+ await waitFor(`document.querySelector('.ant-drawer-body')?.innerText.includes('已确认提交 2 / 2')`);
+ const detail=await evaluate(`document.querySelector('.ant-drawer-body').innerText`);
+ assert(detail.includes('删除 1')&&!detail.includes('DELETE FROM')&&!detail.includes('结构复核'),detail);
+ checks.push('D6 durable record shows alignment and delete counts without DML parameters or unrelated structure verification');
+}
+
+export async function checkAlignmentBridge({request,scan,complete,checks,evaluate,waitFor,command}) {
+ const taskId=await scan('ui_delete_stop');
+ let result=await request('merge-plan',{taskId,direction:'left-to-right',mode:'align'});
+ assert(result.ok&&result.plan.counts.delete===800,JSON.stringify(result));
+ let page=await request('merge-page',{planId:result.plan.id,offset:256,limit:20,action:'delete'});
+ assert(page.ok&&page.total===800&&page.rows.length===20&&page.rows.every(r=>r.action==='delete'&&r.sql.startsWith('DELETE FROM')),JSON.stringify(page));
+ const args={planId:result.plan.id,confirmed:true};
+ assert.equal((await request('merge-execute',args)).ok,false);
+ assert.equal((await request('merge-status')).running,false);
+ await request('merge-invalidate');
+ assert.equal((await request('merge-execute',{...args,deleteConfirmed:true})).ok,false);
+ result=await request('merge-plan',{taskId,direction:'left-to-right',mode:'align'});
+ assert(result.ok,JSON.stringify(result));
+ assert((await request('merge-execute',{planId:result.plan.id,confirmed:true,deleteConfirmed:true})).ok);
+ assert(!(await request('merge-execute',{planId:result.plan.id,confirmed:true,deleteConfirmed:true})).ok);
+ assert((await request('merge-stop')).ok);
+ const stopped=await complete();
+ assert.equal(stopped.mode,'data-align');assert.equal(stopped.status,'stopped');
+ assert(stopped.committed<800&&stopped.committed%256===0,JSON.stringify(stopped));
+ assert(stopped.batches.some(b=>b.status==='pending')&&!stopped.batches.some(b=>b.status==='running'));
+ checks.push({name:'D6 real bridge confirms deletes, paginates delete-only, rejects stale/duplicate, stops at batch boundary',committed:stopped.committed,total:800});
+ const failedTask=await scan('align_fk_restrict');
+ const failedPlan=await request('merge-plan',{taskId:failedTask,direction:'left-to-right',mode:'align'});
+ assert(failedPlan.ok,JSON.stringify(failedPlan));
+ assert((await request('merge-execute',{planId:failedPlan.plan.id,confirmed:true,deleteConfirmed:true})).ok);
+ const failed=await complete();
+ assert.equal(failed.status,'failed');assert.equal(failed.committed,0);
+ // Restore the application's own WebChannel after the bridge probe's separate client.
+ await command('Page.reload');
+ await waitFor(`document.querySelector('#left-table')?.value==='ui_sample'`);
+ await evaluate(`[...document.querySelectorAll('[role=tab]')].find(t=>t.innerText.includes('数据比对')).click()`);
+ await waitFor(`document.querySelector('.data-workbench .sync-panel')?.innerText.includes('失败 · 已确认提交 0 / 2')`);
+ const feedback=await evaluate(`document.querySelector('.data-workbench .sync-panel').innerText`);
+ assert(feedback.includes('已回滚')&&feedback.includes('驱动错误码 1451'),feedback);
+ await evaluate(`[...document.querySelectorAll('[role=menuitem]')].find(e=>e.innerText==='执行记录').click()`);
+ await waitFor(`document.body.innerText.includes('数据完全对齐')`);
+ await evaluate(`[...document.querySelectorAll('tr')].find(e=>e.innerText.includes('数据完全对齐')&&e.innerText.includes('已停止')).querySelector('button').click()`);
+ await waitFor(`document.querySelector('.ant-drawer-body')?.innerText.includes('未执行')`);
+ assert((await evaluate(`document.querySelector('.ant-drawer-body').innerText`)).includes('删除 800'));
+ checks.push('D6 actual FK-failed execution appears in Qt with rollback; stopped alignment record shows pending batches');
+}

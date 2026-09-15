@@ -97,7 +97,7 @@ void Foundation::recoverSyncRecords() {
         QFile file(folder.filePath(name));
         if (!file.open(QIODevice::ReadOnly)) continue;
         auto record = QJsonDocument::fromJson(file.readAll()).object();
-        const bool dataRecord=record["mode"]=="data-fill" || record["mode"]=="data-merge";
+        const bool dataRecord=record["mode"]=="data-fill" || record["mode"]=="data-merge" || record["mode"]=="data-align";
         if (QUuid(record["id"].toString()).isNull() || !(dataRecord?record["batches"].isArray():record["steps"].isArray())) continue;
         bool recovered=record["status"]=="running";
         if (record["status"] == "running") {
@@ -107,7 +107,7 @@ void Foundation::recoverSyncRecords() {
             record["steps"] = steps;
             if (!writeJson(folder.filePath(name), record)) record["storageWarning"] = "恢复状态无法保存，原文件已保留";
         }
-        if(record["mode"]=="data-fill" || record["mode"]=="data-merge") {
+        if(record["mode"]=="data-fill" || record["mode"]=="data-merge" || record["mode"]=="data-align") {
             auto batches=record["batches"].toArray();
             for(qsizetype i=0;i<batches.size();++i) { auto batch=batches[i].toObject(); if(batch["status"]=="running") {batch["status"]="unknown";batches[i]=batch;recovered=true;} }
             record["batches"]=batches;

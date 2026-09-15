@@ -20,6 +20,7 @@ def main():
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--desktop-script', type=Path, default=Path(__file__).with_name('desktop_merge.mjs'))
     parser.add_argument('--skip-desktop', action='store_true')
+    parser.add_argument('--align', action='store_true', help='Also run D6 alignment cases')
     args = parser.parse_args()
     args.output.parent.mkdir(parents=True, exist_ok=True)
     evidence = {'result': 'running', 'checks': []}
@@ -346,6 +347,10 @@ def main():
                 record('strict writer refuses zero date despite permissive server default')
                 sql("SET GLOBAL sql_mode='STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,NO_ENGINE_SUBSTITUTION';")
 
+                if args.align:
+                    from integration_align import check_alignment
+                    check_alignment(sql, pair, scan, plan, batch, invoke, record)
+
                 if not args.skip_desktop:
                     pair('ui_sample')
                     sql('INSERT INTO d5_left.ui_sample VALUES(1,10,9),(2,20,9); INSERT INTO d5_right.ui_sample VALUES(1,11,9),(3,30,9);')
@@ -353,6 +358,9 @@ def main():
                     sql('INSERT INTO d5_left.ui_stop WITH RECURSIVE seq AS '
                         '(SELECT 1 n UNION ALL SELECT n+1 FROM seq WHERE n<800) SELECT n,n,9 FROM seq;')
                     sql("CREATE USER 'd5_ui'@'localhost' IDENTIFIED BY ''; GRANT SELECT ON *.* TO 'd5_ui'@'localhost'; GRANT ALL ON d5_left.* TO 'd5_ui'@'localhost'; GRANT ALL ON d5_right.* TO 'd5_ui'@'localhost';")
+                    if args.align:
+                        pair('ui_delete_stop')
+                        sql('INSERT INTO d5_right.ui_delete_stop SELECT * FROM d5_left.ui_stop;')
                     ui_state = root / 'ui-state'
                     ui_state.mkdir()
                     left_id, right_id = str(uuid.uuid4()), str(uuid.uuid4())
@@ -370,16 +378,20 @@ def main():
                     with (root / 'desktop.log').open('wb') as desktop_log:
                         desktop = subprocess.Popen([str(args.app.resolve())], stdout=desktop_log, stderr=desktop_log,
                             env=os.environ | {'SPEED_SYNC_DATA_DIR': str(ui_state), 'QTWEBENGINE_REMOTE_DEBUGGING': f'127.0.0.1:{debug_port}'})
-                        desktop_output = args.output.parent / 'd5-desktop.json'
+                        desktop_output = args.output.parent / ('d6-desktop.json' if args.align else 'd5-desktop.json')
                         subprocess.run(['node', str(args.desktop_script.resolve()), '--port', str(debug_port),
-                                        '--output', str(desktop_output)], check=True, timeout=240)
+                                        '--output', str(desktop_output), '--align', str(args.align).lower()], check=True, timeout=240)
                     evidence['desktop'] = json.loads(desktop_output.read_text())
-                    assert sql('SELECT id,value FROM d5_right.ui_sample ORDER BY id;') == '1\t11\n2\t20\n3\t30'
-                    record('real Qt default fill independently verified in target database')
+                    assert sql('SELECT id,value FROM d5_right.ui_sample ORDER BY id;') == ('1\t10\n2\t20' if args.align else '1\t11\n2\t20\n3\t30')
+                    record('real Qt ' + ('alignment' if args.align else 'default fill') + ' independently verified in target database')
+                    if args.align:
+                        stopped = next(c for c in evidence['desktop']['checks'] if isinstance(c, dict) and c.get('name', '').startswith('D6 real bridge confirms deletes'))
+                        assert sql('SELECT COUNT(*) FROM d5_right.ui_delete_stop;') == str(800 - stopped['committed'])
+                        record('D6 stopped deletion count independently matches database', committed=stopped['committed'])
                 else:
                     evidence['desktop'] = {'result': 'NOT RUN', 'reason': '--skip-desktop'}
                 evidence['result'] = 'passed'
-                print(f"{len(evidence['checks'])} D5 isolated MySQL checks passed")
+                print(f"{len(evidence['checks'])} D5/D6 isolated MySQL checks passed")
             except Exception as error:
                 evidence['result'] = 'failed'
                 evidence['error'] = str(error).replace(secret, '[redacted]') if secret else str(error)

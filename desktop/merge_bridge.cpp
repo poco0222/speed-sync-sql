@@ -72,6 +72,7 @@ QJsonObject Foundation::mergeOperation(const QString &operation,const QJsonObjec
     if(syncExecuting||mergeExecuting||!jobs.isEmpty())return fail("请等待当前任务结束","busy");
     if(args["confirmed"]!=true)return fail("请先确认本次数据写入摘要","validation");
     if(mergePlan.isEmpty()||args["planId"]!=mergePlan["id"]||mergePlan["taskId"]!=dataState["id"]||!dataState["complete"].toBool())return fail("数据计划已过期，请重新预览","stale");
+    if(mergePlan["counts"].toObject()["delete"].toDouble()>0 && args["deleteConfirmed"]!=true)return fail("请单独确认本次删除数量与范围（删除整行）","validation");
     if(mergePlan["total"].toInt()<=0)return fail("当前计划没有可执行操作","validation");
     for(auto side:{"left","right"}){
         auto endpoint=mergePlan[side].toObject();endpoint.remove("connectionId");endpoint.remove("connectionDigest");endpoint.remove("name");
@@ -80,7 +81,7 @@ QJsonObject Foundation::mergeOperation(const QString &operation,const QJsonObjec
     mergePayload={{"operation","merge-batch"},{"path",dataPath}};QString error;
     if(!syncConnections(mergePayload,error)){mergePayload={};return fail(error,"credentials");}
     mergePayload["args"]=QJsonObject{{"planId",mergePlan["id"]},{"offset",0},{"limit",256}};
-    mergeRecord={{"id",QUuid::createUuid().toString(QUuid::WithoutBraces)},{"formatVersion",1},{"mode",mergePlan["mode"]=="fill"?"data-fill":"data-merge"},{"direction",mergePlan["direction"]},{"left",mergePlan["left"]},{"right",mergePlan["right"]},{"counts",mergePlan["counts"]},{"total",mergePlan["total"]},{"committed",0},{"status","running"},{"stage","checking"},{"startedAt",stamp()},{"steps",QJsonArray{}},{"verification",QJsonObject{{"status","pending"}}}};
+    mergeRecord={{"id",QUuid::createUuid().toString(QUuid::WithoutBraces)},{"formatVersion",1},{"mode",mergePlan["mode"]=="fill"?"data-fill":mergePlan["mode"]=="align"?"data-align":"data-merge"},{"direction",mergePlan["direction"]},{"left",mergePlan["left"]},{"right",mergePlan["right"]},{"counts",mergePlan["counts"]},{"total",mergePlan["total"]},{"committed",0},{"status","running"},{"stage","checking"},{"startedAt",stamp()},{"steps",QJsonArray{}},{"verification",QJsonObject{{"status","pending"}}}};
     QJsonArray batches;const auto total=mergePlan["total"].toInt();for(int offset=0;offset<total;offset+=256)batches.append(QJsonObject{{"index",offset/256+1},{"count",qMin(256,total-offset)},{"status","pending"}});mergeRecord["batches"]=batches;
     if(!saveMergeRecord()){
         mergeRecord["status"]="blocked";mergeRecord["stage"]="finished";mergeRecord["finishedAt"]=stamp();mergeRecord["error"]="无法保存初始执行记录，未写入数据库";

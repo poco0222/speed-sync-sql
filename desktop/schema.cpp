@@ -148,7 +148,7 @@ QJsonObject readConnected(QSqlDatabase &db, const QJsonObject &args) {
         result["databaseCollation"] = q.value(0).toString();
         const bool globalSelect = hasPrivilege(grants, "SELECT", {}, {}, 0);
         const bool databaseTrigger = hasPrivilege(grants, "TRIGGER", database, {}, 1);
-        auto incoming = queryCategory(db, "SELECT CONSTRAINT_NAME AS name, TABLE_SCHEMA AS databaseName, TABLE_NAME AS tableName, COLUMN_NAME AS columnName, REFERENCED_COLUMN_NAME AS referencedColumn FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE REFERENCED_TABLE_SCHEMA=? AND REFERENCED_TABLE_NAME=? ORDER BY TABLE_SCHEMA,TABLE_NAME,CONSTRAINT_NAME,ORDINAL_POSITION", {database, table}, "name");
+        auto incoming = queryCategory(db, "SELECT k.CONSTRAINT_NAME AS name, k.TABLE_SCHEMA AS databaseName, k.TABLE_NAME AS tableName, k.COLUMN_NAME AS columnName, k.REFERENCED_COLUMN_NAME AS referencedColumn, r.DELETE_RULE AS deleteRule FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE k LEFT JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS r ON r.CONSTRAINT_SCHEMA=k.CONSTRAINT_SCHEMA AND r.TABLE_NAME=k.TABLE_NAME AND r.CONSTRAINT_NAME=k.CONSTRAINT_NAME WHERE k.REFERENCED_TABLE_SCHEMA=? AND k.REFERENCED_TABLE_NAME=? ORDER BY k.TABLE_SCHEMA,k.TABLE_NAME,k.CONSTRAINT_NAME,k.ORDINAL_POSITION", {database, table}, "name");
         auto names = queryCategory(db, "SELECT TRIGGER_NAME AS name, EVENT_OBJECT_TABLE AS tableName FROM INFORMATION_SCHEMA.TRIGGERS WHERE TRIGGER_SCHEMA=? ORDER BY TRIGGER_NAME", {database}, "name");
         result["syncGuard"] = QJsonObject{{"complete", globalSelect && databaseTrigger && incoming["state"] == "complete" && names["state"] == "complete"}, {"incoming", incoming["items"]}, {"triggerNames", names["items"]}};
     }

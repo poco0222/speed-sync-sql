@@ -283,6 +283,19 @@ QString statement(const Meta &target,const QStringList &key,const QStringList &f
     for(const auto &f:key) predicates<<quote(f)+"="+parameter(*column(target,f));
     return "UPDATE "+target.table+" SET "+assignments.join(',')+" WHERE "+predicates.join(" AND ");
 }
+QString deleteStatement(const Meta &target,const QStringList &key) {
+    QStringList predicates; for(const auto &f:key) predicates<<quote(f)+"="+parameter(*column(target,f));
+    return "DELETE FROM "+target.table+" WHERE "+predicates.join(" AND ");
+}
+void deleteGuard(const QJsonObject &snapshot,QJsonArray &warnings) {
+    for(auto value:snapshot["syncGuard"].toObject()["incoming"].toArray()) {
+        const auto item=value.toObject(),p=item["properties"].toObject();
+        const auto rule=p["deleteRule"].toString();
+        const auto name=p["databaseName"].toString()+"."+p["tableName"].toString()+" / "+item["name"].toString();
+        require(rule=="RESTRICT"||rule=="NO ACTION","外键 "+name+" 的删除规则 "+rule+" 可能跨表修改或不可确认，禁止自动删除","unsupported");
+        warnings.append("外键 "+name+" 保持启用；存在引用时删除失败并回滚当前批次");
+    }
+}
 void mergeGuard(const QJsonObject &snapshot,const Meta &meta,const QStringList &key,const QStringList &fields,QJsonArray &warnings) {
     require(snapshot["ok"].toBool() && snapshot["existence"]=="present","扫描时结构基线不完整，请重新比对","stale");
     require(meta.engine.compare("InnoDB",Qt::CaseInsensitive)==0,"数据写入仅支持 InnoDB","unsupported");
@@ -312,7 +325,7 @@ QJsonObject buildMerge(const QJsonObject &input,const Meta &lm,const Meta &rm) {
     const auto status=loadObject(path+"/status.json"),baseline=loadObject(path+"/scan-baseline.json"),scanArgs=baseline["args"].toObject();
     require(status["complete"].toBool() && status["state"]=="complete" && status["mode"]=="compare" && status["id"]==args["taskId"] && baseline["taskId"]==args["taskId"],"需要当前完整且有可靠键的数据比对","stale");
     const auto direction=args["direction"].toString(),mode=args["mode"].toString();
-    require(direction=="left-to-right"||direction=="right-to-left","同步方向无效","validation"); require(mode=="fill"||mode=="merge","数据同步模式无效","validation");
+    require(direction=="left-to-right"||direction=="right-to-left","同步方向无效","validation"); require(mode=="fill"||mode=="merge"||mode=="align","数据同步模式无效","validation");
     const QString source=direction=="left-to-right"?"left":"right",target=source=="left"?"right":"left";
     const auto key=strings(scanArgs["key"]); require(!key.isEmpty(),"没有可靠匹配键，不能写入","unsupported");
     auto prep=prepare(lm,rm); bool valid=false; for(auto k:prep["keys"].toArray()) if(strings(k.toObject()["fields"])==key) valid=true; require(valid,"匹配键已失效","stale");
@@ -320,30 +333,32 @@ QJsonObject buildMerge(const QJsonObject &input,const Meta &lm,const Meta &rm) {
     const auto targetSnapshot=baseline[target].toObject(); const auto &targetMeta=target=="left"?lm:rm;
     QJsonObject plan{{"id",QUuid::createUuid().toString(QUuid::WithoutBraces)},{"taskId",args["taskId"]},{"direction",direction},{"mode",mode},{"left",scanArgs["left"]},{"right",scanArgs["right"]},{"key",scanArgs["key"]},{"fields",scanArgs["fields"]},{"filters",scanArgs["filters"]},{"batchSize",256}};
     const auto writable=writeFields(plan,targetSnapshot,key); plan["writeFields"]=QJsonArray::fromStringList(writable);
-    QJsonArray warnings; mergeGuard(targetSnapshot,targetMeta,key,mode=="merge"?writable:key,warnings);
+    QJsonArray warnings; mergeGuard(targetSnapshot,targetMeta,key,mode!="fill"?writable:key,warnings);
     for(const auto &v:plan["fields"].toArray()) if(!writable.contains(v.toString())) warnings.append("生成列 "+v.toString()+" 由目标计算，不直接写入");
     for(const auto &f:writable) require(prep["defaultFields"].toArray().contains(f),"写入字段不兼容","unsupported");
     LocalDb local(path+"/rows.sqlite"); QSqlQuery q(local.db);
     sql(q,"DROP TABLE IF EXISTS merge_operations"); sql(q,"CREATE TABLE merge_operations(seq INTEGER PRIMARY KEY,row_id INTEGER,action TEXT)");
-    q.prepare("SELECT id,status FROM rows WHERE status=? OR (?='merge' AND status='different') ORDER BY id"); q.addBindValue(source+"-only"); q.addBindValue(mode); execute(q);
-    qint64 add=0,modify=0; require(local.db.transaction(),"无法保存临时计划","storage");
+    q.prepare("SELECT id,status FROM rows WHERE status=? OR (?<>'fill' AND status='different') OR (?='align' AND status=?) ORDER BY id"); q.addBindValue(source+"-only"); q.addBindValue(mode); q.addBindValue(mode); q.addBindValue(target+"-only"); execute(q);
+    qint64 add=0,modify=0,remove=0; require(local.db.transaction(),"无法保存临时计划","storage");
     while(q.next()) {
-        const bool insert=q.value(1).toString()==source+"-only"; const auto row=q.value(0).toLongLong();
-        const auto affected=insert?writable:changedFields(local.db,row,plan);
+        const bool insert=q.value(1).toString()==source+"-only", deleting=q.value(1).toString()==target+"-only"; const auto row=q.value(0).toLongLong();
+        const auto affected=deleting?key:insert?writable:changedFields(local.db,row,plan);
         if(!insert && affected.isEmpty()) continue;
-        for(const auto &f:affected) require(column(targetMeta,f)->nullable || !cachedCell(local.db,row,source,f).isNull,"字段 "+f+" 的源 NULL 与目标非空约束不兼容","unsupported");
+        if(!deleting) for(const auto &f:affected) require(column(targetMeta,f)->nullable || !cachedCell(local.db,row,source,f).isNull,"字段 "+f+" 的源 NULL 与目标非空约束不兼容","unsupported");
         if(insert) for(auto filter:scanArgs["filters"].toArray()) require(writable.contains(filter.toObject()["field"].toString()),"新增记录需要包含筛选字段，请选择字段并重新比对","unsupported");
-        QSqlQuery save(local.db); save.prepare("INSERT INTO merge_operations(row_id,action) VALUES(?,?)"); save.addBindValue(row); save.addBindValue(insert?"insert":"update"); execute(save); if(insert) ++add; else ++modify;
+        QSqlQuery save(local.db); save.prepare("INSERT INTO merge_operations(row_id,action) VALUES(?,?)"); save.addBindValue(row); save.addBindValue(deleting?"delete":insert?"insert":"update"); execute(save); if(deleting) ++remove; else if(insert) ++add; else ++modify;
     }
     require(!q.lastError().isValid() && local.db.commit(),"临时计划保存失败","storage");
     if(add) for(const auto &c:targetMeta.columns) {
         const auto p=properties(targetSnapshot,c.name);
         require(writable.contains(c.name)||c.nullable||!p["defaultValue"].isNull()||p["autoIncrement"].toBool()||!p["generationExpression"].toString().isEmpty(),"目标必填字段 "+c.name+" 未参与写入且没有默认值","unsupported");
     }
+    if(remove) deleteGuard(targetSnapshot,warnings);
     QJsonArray statements; if(add) statements.append(statement(targetMeta,key,writable,true,targetSnapshot));
     auto updates=writable; updates.removeIf([&](const QString &f){return key.contains(f);}); if(modify) statements.append(statement(targetMeta,key,updates,false,targetSnapshot));
+    if(remove) statements.append(deleteStatement(targetMeta,key));
     QJsonObject times; for(auto k:{"leftStartedAt","rightStartedAt","leftFinishedAt","rightFinishedAt","consistency"}) times[k]=status[k];
-    plan["counts"]=QJsonObject{{"add",double(add)},{"modify",double(modify)},{"delete",0}}; plan["total"]=double(add+modify); plan["readTimes"]=times; plan["warnings"]=warnings; plan["sql"]=statements;
+    plan["counts"]=QJsonObject{{"add",double(add)},{"modify",double(modify)},{"delete",double(remove)}}; plan["total"]=double(add+modify+remove); plan["readTimes"]=times; plan["warnings"]=warnings; plan["sql"]=statements;
     saveObject(path+"/merge-plan.json",plan); return {{"ok",true},{"plan",plan}};
 }
 QJsonObject executeMergeBatch(const QJsonObject &input,Connection &left,Connection &right,const Meta &lm,const Meta &rm) {
@@ -354,14 +369,16 @@ QJsonObject executeMergeBatch(const QJsonObject &input,Connection &left,Connecti
     const QString source=plan["direction"]=="left-to-right"?"left":"right",target=source=="left"?"right":"left";
     auto &remote=target=="left"?left:right; const auto &meta=target=="left"?lm:rm; const auto snapshot=baseline[target].toObject(); const auto key=strings(plan["key"]);
     LocalDb local(path+"/rows.sqlite"); QSqlQuery operations(local.db); operations.prepare("SELECT row_id,action FROM merge_operations ORDER BY seq LIMIT ? OFFSET ?"); operations.addBindValue(limit); operations.addBindValue(offset); execute(operations);
-    QList<QPair<qint64,bool>> batch; while(operations.next()) batch.append({operations.value(0).toLongLong(),operations.value(1).toString()=="insert"}); require(!batch.isEmpty(),"批次没有操作","validation");
+    QList<QPair<qint64,QString>> batch; while(operations.next()) batch.append({operations.value(0).toLongLong(),operations.value(1).toString()}); require(!batch.isEmpty(),"批次没有操作","validation");
     QSqlQuery tx(remote.db); sql(tx,"SET SESSION sql_mode = 'STRICT_ALL_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_VALUE_ON_ZERO'"); sql(tx,"SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ");
     require(remote.db.transaction(),"无法开始数据写入事务","query"); bool committing=false;
     try {
         // Touch the target before the independent metadata read; its MDL lasts through COMMIT.
         sql(tx,"SELECT 1 FROM "+meta.table+" LIMIT 0");
         for(auto side:{"left","right"}) require(schemaBaseline(input[side].toObject(),plan[side].toObject())==baseline[side].toObject(),"写入前结构或权限变化，请重新比对","stale");
-        for(const auto &[row,insert]:batch) {
+        for(const auto &[row,action]:batch) {
+            const bool insert=action=="insert",deleting=action=="delete";
+            require(insert||deleting||action=="update","计划操作无效","storage");
             QStringList predicates,expressions; const auto keySide=insert?source:target;
             for(const auto &f:key) predicates<<quote(f)+"="+parameter(*column(meta,f));
             for(const auto &c:meta.columns) expressions<<valueExpression(c);
@@ -374,10 +391,10 @@ QJsonObject executeMergeBatch(const QJsonObject &input,Connection &left,Connecti
                 require(old.isNull==value.isNull() && (old.isNull||old.text==text),"目标旧值已变化，请重新比对","conflict");
             }
             if(found) require(!current.next(),"匹配键不再唯一","conflict"); current.finish();
-            const auto fields=insert?strings(plan["writeFields"]):changedFields(local.db,row,plan);
-            QSqlQuery write(remote.db); require(write.prepare(statement(meta,key,fields,insert,snapshot)),"无法准备数据语句","query");
+            const auto fields=deleting?QStringList{}:insert?strings(plan["writeFields"]):changedFields(local.db,row,plan);
+            QSqlQuery write(remote.db); require(write.prepare(deleting?deleteStatement(meta,key):statement(meta,key,fields,insert,snapshot)),"无法准备数据语句","query");
             for(const auto &f:fields) bindCell(write,cachedCell(local.db,row,source,f)); if(!insert) for(const auto &f:key) bindCell(write,cachedCell(local.db,row,target,f));
-            require(write.exec(),QString("数据批次失败（驱动错误码 %1）").arg(write.lastError().nativeErrorCode()),"query");
+            require(write.exec(),QString("数据批次失败：约束冲突或 SQL 被拒绝（驱动错误码 %1）").arg(write.lastError().nativeErrorCode()),"query");
             require(write.numRowsAffected()==1,"数据写入未影响预期的一条记录","conflict");
         }
         committing=true; require(remote.db.commit(),"提交响应无法确认，请重新比对核实","unknown");
@@ -433,15 +450,19 @@ QJsonObject readMergePage(const QString &path,const QJsonObject &args) {
         const int offset=args["offset"].toInt(-1),limit=args["limit"].toInt(-1);
         require(offset>=0 && args["offset"].toDouble()==offset && limit>0 && limit<=100,"预览分页无效","validation");
         LocalDb local(path+"/rows.sqlite",true); QSqlQuery q(local.db);
-        q.prepare("SELECT o.row_id,o.action,r.key_text FROM merge_operations o JOIN rows r ON r.id=o.row_id ORDER BY o.seq LIMIT ? OFFSET ?"); q.addBindValue(limit); q.addBindValue(offset); execute(q);
+        const auto action=args["action"].toString(QStringLiteral("")); require(action.isEmpty()||action=="delete","预览操作分类无效","validation");
+        q.prepare("SELECT o.row_id,o.action,r.key_text FROM merge_operations o JOIN rows r ON r.id=o.row_id WHERE (?='' OR o.action=?) ORDER BY o.seq LIMIT ? OFFSET ?"); q.addBindValue(action); q.addBindValue(action); q.addBindValue(limit); q.addBindValue(offset); execute(q);
         const QString source=plan["direction"]=="left-to-right"?"left":"right";
         QJsonArray rows;
         while(q.next()) {
-            const auto id=q.value(0).toLongLong(); const bool insert=q.value(1).toString()=="insert";
-            auto fields=insert?strings(plan["writeFields"]):changedFields(local.db,id,plan); QJsonObject sample;
-            for(const auto &f:fields) { const auto cell=cachedCell(local.db,id,source,f); sample[f]=cell.isNull?QJsonValue::Null:QJsonValue(cell.text.left(256)+(cell.text.size()>256?"…（缩略，执行使用完整原值）":"")); }
-            rows.append(QJsonObject{{"id",QString::number(id)},{"key",array(q.value(2).toString())},{"action",insert?"insert":"update"},{"fields",QJsonArray::fromStringList(fields)},{"sql",insert?plan["sql"].toArray().first():plan["sql"].toArray().last()},{"sample",sample}});
+            const auto id=q.value(0).toLongLong(); const auto operation=q.value(1).toString();
+            const bool insert=operation=="insert",deleting=operation=="delete";
+            const auto side=deleting?(source=="left"?QString("right"):QString("left")):source;
+            auto fields=deleting?strings(plan["key"]):insert?strings(plan["writeFields"]):changedFields(local.db,id,plan); QJsonObject sample;
+            for(const auto &f:fields) { const auto cell=cachedCell(local.db,id,side,f); sample[f]=cell.isNull?QJsonValue::Null:QJsonValue(cell.text.left(256)+(cell.text.size()>256?"…（缩略，执行使用完整原值）":"")); }
+            QString statement; for(auto sql:plan["sql"].toArray()) if(sql.toString().startsWith(operation.toUpper()+" ")) statement=sql.toString();
+            rows.append(QJsonObject{{"id",QString::number(id)},{"key",array(q.value(2).toString())},{"action",operation},{"fields",QJsonArray::fromStringList(fields)},{"sql",statement},{"sample",sample}});
         }
-        return {{"ok",true},{"rows",rows},{"total",plan["total"]}};
+        return {{"ok",true},{"rows",rows},{"total",action=="delete"?plan["counts"].toObject()["delete"]:plan["total"]}};
     } catch(const Error &e) { return failure(e.message,e.code); }
 }

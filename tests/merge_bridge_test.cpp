@@ -28,16 +28,33 @@ class MergeBridgeTest : public QObject {
             QVERIFY(service.execute("select",{{"side",side},{"id",saved["id"]}})["ok"].toBool());
         }
     }
-    QJsonObject plan(Foundation &service) {
+    QJsonObject plan(Foundation &service,const QString &mode="fill") {
         const QJsonObject args{{"left",QJsonObject{{"database","a"},{"table","t"}}},{"right",QJsonObject{{"database","b"},{"table","t"}}},{"mode","compare"},{"key",QJsonArray{"id"}},{"fields",QJsonArray{"id","value"}},{"filters",QJsonArray{}}};
         auto started=send(service,"data-start",args);if(!started["ok"].toBool())return started;
         QElapsedTimer wait;wait.start();while(service.busy()&&wait.elapsed()<4000)QTest::qWait(20);
         if(service.busy())return {{"ok",false},{"error","fixture scan timeout"}};
-        return send(service,"merge-plan",{{"taskId",started["taskId"]},{"direction","left-to-right"},{"mode","fill"}});
+        return send(service,"merge-plan",{{"taskId",started["taskId"]},{"direction","left-to-right"},{"mode",mode}});
     }
     QJsonObject record(Foundation &service){return service.execute("merge-status",{})["record"].toObject();}
     QJsonObject execute(Foundation &service,const QJsonObject &p){return service.execute("merge-execute",{{"planId",p["plan"].toObject()["id"]},{"confirmed",true}});}
 private slots:
+    void deleteConfirmation() {
+        QTemporaryDir dir;Foundation s(dir.path());setup(s);auto p=plan(s,"align");QVERIFY(p["ok"].toBool());
+        const auto id=p["plan"].toObject()["id"];
+        QCOMPARE(execute(s,p)["code"].toString(),QString("validation"));QVERIFY(!s.busy());
+        auto args=QJsonObject{{"planId",id},{"confirmed",true},{"deleteConfirmed",true}};
+        QVERIFY(s.execute("merge-execute",args)["ok"].toBool());
+        QVERIFY(!s.execute("merge-execute",args)["ok"].toBool());
+        QTRY_VERIFY_WITH_TIMEOUT(!s.busy(),6000);
+        QCOMPARE(record(s)["mode"].toString(),QString("data-align"));
+        QCOMPARE(record(s)["counts"].toObject()["delete"].toInt(),600);
+        QVERIFY(!s.execute("merge-execute",args)["ok"].toBool());
+        p=plan(s,"align");QVERIFY(p["ok"].toBool());
+        QCOMPARE(execute(s,p)["code"].toString(),QString("validation"));
+        s.execute("merge-invalidate",{});
+        args["planId"]=p["plan"].toObject()["id"];
+        QCOMPARE(s.execute("merge-execute",args)["code"].toString(),QString("stale"));
+    }
     void confirmationStaleAndDuplicate() {
         QTemporaryDir dir;Foundation s(dir.path());setup(s);auto p=plan(s);QVERIFY(p["ok"].toBool());
         const auto id=p["plan"].toObject()["id"];
@@ -93,10 +110,15 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!s.busy(),5000);auto r=record(s);QCOMPARE(r["status"].toString(),QString("blocked"));QCOMPARE(r["committed"].toInt(),256);
         QCOMPARE(r["batches"].toArray()[1].toObject()["status"].toString(),QString("pending"));QVERIFY(r.contains("storageWarning"));
     }
+    void crashRecovery_data() {
+        QTest::addColumn<QString>("recordMode");
+        QTest::newRow("fill")<<"data-fill";QTest::newRow("align")<<"data-align";
+    }
     void crashRecovery() {
+        QFETCH(QString,recordMode);
         QTemporaryDir dir;QVERIFY(QDir().mkpath(dir.filePath("sync-records")));const auto id=QUuid::createUuid().toString(QUuid::WithoutBraces);
         QFile f(dir.filePath("sync-records/"+id+".json"));QVERIFY(f.open(QIODevice::WriteOnly));
-        f.write(QJsonDocument(QJsonObject{{"id",id},{"mode","data-fill"},{"status","running"},{"committed",256},{"batches",QJsonArray{QJsonObject{{"status","passed"}},QJsonObject{{"status","running"}},QJsonObject{{"status","pending"}}}}}).toJson());f.close();
+        f.write(QJsonDocument(QJsonObject{{"id",id},{"mode",recordMode},{"status","running"},{"committed",256},{"batches",QJsonArray{QJsonObject{{"status","passed"}},QJsonObject{{"status","running"}},QJsonObject{{"status","pending"}}}}}).toJson());f.close();
         Foundation s(dir.path());auto rows=s.execute("sync-records",{})["records"].toArray();QCOMPARE(rows.size(),1);const auto r=rows[0].toObject();
         QCOMPARE(r["status"].toString(),QString("unknown"));QCOMPARE(r["committed"].toInt(),256);QCOMPARE(r["batches"].toArray()[1].toObject()["status"].toString(),QString("unknown"));QCOMPARE(r["batches"].toArray()[2].toObject()["status"].toString(),QString("pending"));QVERIFY(!s.busy());
         QVERIFY(f.open(QIODevice::ReadOnly));const auto persisted=QJsonDocument::fromJson(f.readAll()).object();f.close();
@@ -117,6 +139,10 @@ int main(int argc,char **argv) {
             QFile status(p["path"].toString()+"/status.json");if(!status.open(QIODevice::WriteOnly))return 1;status.write(QJsonDocument(task).toJson());status.close();result["task"]=task;
         } else if(operation=="merge-plan") {
             result["plan"]=QJsonObject{{"id",QUuid::createUuid().toString(QUuid::WithoutBraces)},{"taskId",args["taskId"]},{"direction","left-to-right"},{"mode","fill"},{"left",QJsonObject{{"database","a"},{"table","t"}}},{"right",QJsonObject{{"database","b"},{"table","t"}}},{"key",QJsonArray{"id"}},{"fields",QJsonArray{"value"}},{"filters",QJsonArray{}},{"counts",QJsonObject{{"add",600},{"modify",0},{"delete",0}}},{"total",600},{"batchSize",256},{"sql",QJsonArray{"FIXTURE ONLY"}}};
+            if(args["mode"]=="align") {
+                auto plan=result["plan"].toObject();plan["mode"]="align";
+                plan["counts"]=QJsonObject{{"add",0},{"modify",0},{"delete",600}};result["plan"]=plan;
+            }
         } else if(operation=="merge-batch") {
             QThread::msleep(400);const auto offset=args["offset"].toInt();const auto mode=p["right"].toObject()["name"].toString();
             result={{"ok",true},{"status","passed"},{"committed",qMin(256,600-offset)}};
