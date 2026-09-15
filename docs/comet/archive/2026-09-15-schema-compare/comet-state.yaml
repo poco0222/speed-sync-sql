@@ -1,0 +1,251 @@
+schema: comet.native.v4
+name: schema-compare
+language: zh-CN
+phase: archive
+status: done
+state_version: 16
+brief: brief.md
+shape_confirmation_hash: 31eb483b5959ede30130012164d73903051c49c0ea99804f8ed35765da90f046
+spec_changes:
+  - capability: schema-compare
+    operation: create
+    source: specs/schema-compare/spec.md
+workspace:
+  isolation: current
+  change_branch: main
+  target_branch: main
+  finish: null
+loop:
+  stage: done
+  goal_cycle: 1
+  iteration: 3
+  attempt: 2
+  retry_epoch: 0
+  failed_iteration_count: 2
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: null
+acceptance:
+  - id: A1
+    source: brief.md
+    text: A1：显式读取两端可见数据库与表清单，支持搜索、刷新、同名配对和不同名手动配对；仅清单读取不标相同/不同。可见性不足不判缺表，确证缺失才显示仅左/仅右。
+    result: passed
+    reason:
+      text: Explicit catalog loading, pairing, privilege-aware missing detection
+        verified against code and real fixtures.
+      truncated: false
+  - id: A2
+    source: brief.md
+    text: A2：实际 MySQL
+      样本及单元样本覆盖字段名称/顺序/类型/精度/NULL/默认值/字符集/排序规则/注释/自增/生成表达式/可见性，以及主键、普通/唯一/全文/空间/函数/不可见索引属性；字符串与表达式不被粗暴规范化，当前自增计数不产生结构差异。
+    result: passed
+    reason:
+      text: Per-property matrix plus real MySQL
+        ordinary/unique/primary/function/invisible/FULLTEXT/SPATIAL indexes
+        verified; auto-increment counters ignored.
+      truncated: false
+  - id: A3
+    source: brief.md
+    text: A3：外键列/引用关系/动作、CHECK
+      表达式/启用状态、表引擎/字符集/排序规则/注释/行格式，以及触发器事件/时机/顺序/正文/DEFINER/sql_mode/字符集上下文可对照；分区、未知选项及无法安全解释的特性显示定义与不支持原因。
+    result: passed
+    reason:
+      text: Constraints, CHECK, table attributes and trigger context verified; special
+        options retain definitions with restricted status.
+      truncated: false
+  - id: A4
+    source: brief.md
+    text: A4：相同、不同、仅左、仅右、未读取、读取失败、不支持有明确文字；权限不足、空结果、缺失、取消、部分失败分别测试。只有全部必需类别完整且受支持才可宣称结构相同，部分可读结果可查看但不假报全表一致。
+    result: passed
+    reason:
+      text: Seven object states, incomplete categories, permission filtering,
+        cancellation and missing tables cannot become false equality.
+      truncated: false
+  - id: A5
+    source: brief.md
+    text: A5：真实桌面完成选库表、比对、分类/搜索/只看差异、长定义左右查看与复制；原始 DDL
+      文本不同不直接决定结构不同。浅/深主题、标准/紧凑密度、1440×900、1280×800、约 1024px 宽及缩放下，上下文和关键操作可达。
+    result: passed
+    reason:
+      text: "Current Runtime desktop pass: 13 real Qt checks, four screenshots,
+        filters, both long table and trigger full native clipboard copies,
+        themes and sizes."
+      truncated: false
+  - id: A6
+    source: brief.md
+    text: A6：后台读取保持窗口响应，取消与超时释放任务。换连接/编辑或删除连接/换库表/刷新后旧请求不覆盖新上下文；重启恢复选择和尺寸但不联网或恢复旧结果；旧配置正常加载，保存失败可见。
+    result: passed
+    reason:
+      text: Process timeout/cancellation, generation isolation, workspace persistence
+        and reload without stale comparison verified.
+      truncated: false
+  - id: A7
+    source: brief.md
+    text: A7：原生保存对话框导出 JSON
+      完整差异摘要，含左右别名/库表、读取时间、版本、完整对象状态/属性差异和未完成原因，不随界面筛选遗漏；不含密码、连接串、主机和登录账号。取消不报错，保存失败反馈；过期结果禁止导出为当前结果。
+    result: passed
+    reason:
+      text: Native full JSON report uses cached rows independent of filters, excludes
+        connection credentials and covers cancel/save failure/stale cache.
+      truncated: false
+  - id: A8
+    source: brief.md
+    text: A8：D1 回归与新增比对检查、前端类型检查/构建、原生构建、隔离本地 MySQL 集成和真实桌面检查有通过证据；应用读取路径不执行
+      DDL/DML、不读取业务行。无环境的目标系统/版本特性明确记录 NOT RUN，不用模拟结果冒充实测。
+    result: passed
+    reason:
+      text: Applicable Runtime build, frontend6, CTest3, credentials, D1 probe8,
+        MySQL16 and desktop13 evidence verified; read-only audit passed.
+      truncated: false
+builder_handoff:
+  candidate_id: d68c5799-9033-4b5a-b494-e8ba228c4f69
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:9d0ed770-fd1c-4df2-a580-9503e7beaf4c
+  iteration: 3
+  summary:
+    text: "A5 test driver repair only: open settings Select by focused keyboard,
+      wait visible options, verify selected values; report starts running and
+      becomes failed on assertion or clipboard cleanup failure, preventing stale
+      passed evidence. Product code unchanged."
+    truncated: false
+  addressed_acceptance_ids:
+    - A5
+  checks:
+    - name:
+        text: real MySQL and desktop
+        truncated: false
+      result: passed
+      note:
+        text: 16 MySQL and 13 Qt desktop checks passed with keyboard selection; final
+          cleanup failure-report branch statically reviewed, Runtime to rerun
+        truncated: false
+  checks_truncated: false
+  known_limits:
+    - text: Windows10/macOS15 remain agreed NOT RUN
+      truncated: false
+  known_limits_truncated: false
+  review:
+    status: passed
+    summary:
+      text: New read-only review confirms keyboard interaction avoids modal
+        coordinates and both assertion/cleanup failures overwrite report. No
+        false-success branch remains.
+      truncated: false
+    reviewer_execution_ref: collaboration:/root/d2_driver_review
+  submitted_at: 2026-09-15T07:10:50.580Z
+blockers: []
+verification:
+  candidate_id: d68c5799-9033-4b5a-b494-e8ba228c4f69
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:8723502e-2873-48a8-bbb4-a4451454bfcb
+  iteration: 3
+  attempt: 2
+  assurance: skill-coordinated
+  verdict: pass
+  checks:
+    - id: d2-desktop-final
+      name:
+        text: Real Qt desktop A5 final driver check
+        truncated: false
+      argv_display:
+        - text: tests/integration_schema.py
+          truncated: false
+        - text: --mysql-home
+          truncated: false
+        - text: /Users/PopoY/Documents/DevTools/mysql/current
+          truncated: false
+        - text: --app
+          truncated: false
+        - text: build/speed-sync-sql.app/Contents/MacOS/speed-sync-sql
+          truncated: false
+        - text: --output
+          truncated: false
+        - text: .local/evidence/d2-mysql.json
+          truncated: false
+        - text: --desktop-script
+          truncated: false
+        - text: tests/desktop_schema.mjs
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 8554
+  summary:
+    text: Independent FINAL FULL verifier collaboration:/root/d2_verifier_final
+      accepted A1-A8 after reviewing complete brief/spec, code, current Runtime
+      evidence and four screenshots. No blocking findings. Old failed driver run
+      retained as history, not claimed passed.
+    truncated: false
+  risks:
+    - text: Windows10/macOS15 real execution remains agreed NOT RUN
+      truncated: false
+    - text: Live database evidence is MySQL8.0.46 only; unknown features
+        conservatively restricted
+      truncated: false
+    - text: No unified cross-server snapshot; not all concurrent changes detectable
+      truncated: false
+    - text: Vite large chunk warning retained
+      truncated: false
+  risks_truncated: false
+  completed_at: 2026-09-15T07:16:25.876Z
+history:
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 1
+    outcome: fail
+    unresolved_ids:
+      - A2
+      - A5
+    summary:
+      text: 独立Verifier
+        collaboration:/root/d2_verifier：6项通过，A2/A5因明确测试覆盖缺口失败。未发现需单列产品缺陷，补真实全文/空间索引、逐属性断言及真实筛选/长定义复制证据后重验。
+      truncated: false
+    completed_at: 2026-09-15T06:57:45.564Z
+  - goal_cycle: 1
+    iteration: 2
+    attempt: 1
+    outcome: fail
+    unresolved_ids:
+      - A5
+    summary:
+      text: "Independent verifier collaboration:/root/d2_verifier2: A2 passed, A5
+        requires test driver timing repair. No confirmed product defect."
+      truncated: false
+    completed_at: 2026-09-15T07:08:50.060Z
+  - goal_cycle: 1
+    iteration: 3
+    attempt: 1
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Repair verification passed for A5; final full verification is required.
+      truncated: false
+    completed_at: 2026-09-15T07:13:21.372Z
+  - goal_cycle: 1
+    iteration: 3
+    attempt: 2
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: Independent FINAL FULL verifier collaboration:/root/d2_verifier_final
+        accepted A1-A8 after reviewing complete brief/spec, code, current
+        Runtime evidence and four screenshots. No blocking findings. Old failed
+        driver run retained as history, not claimed passed.
+      truncated: false
+    completed_at: 2026-09-15T07:16:25.876Z
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pass
+verification_report: verification.md
+archived: true
+created_at: 2026-09-15T06:27:37.183Z
