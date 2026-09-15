@@ -1,6 +1,6 @@
 # Speed Sync SQL
 
-Qt 6.10.2 + React 的 MySQL 桌面连接工具。D1 已实现桌面外壳、左右连接管理与测试、系统凭据存储、主题/密度和诊断导出。结构与数据比对、同步留给后续阶段。
+Qt 6.10.2 + React 的 MySQL 桌面结构比对工具。D1 提供连接管理、系统凭据、主题/密度；D2 增加单表结构比对与差异摘要导出。结构同步和数据比对/同步留给后续阶段。
 
 目标：Windows 10 1809+ x64、macOS 15+ arm64。本机开发环境为 macOS 27 arm64；Windows 10/macOS 15 的运行验证尚未完成。不能把本机构建成功当作双平台验收通过。
 
@@ -65,7 +65,19 @@ Qt 的 MySQL 插件默认可能强制 Intel 架构；`QT_FORCE_MACOS_ALL_ARCHES_
 - TLS 有优先、要求、身份验证、关闭四种模式。要求 TLS 必须真正加密；身份验证要求 CA 与主机名有效。错误不包含原始密码或完整连接串。
 - 诊断导出使用原生保存对话框，取消不报错。导出包含连接别名及测试结果，不包含主机、用户名或密码。
 
-## 检查
+## 结构比对（D2）
+
+在工作台选择左右连接，输入库表名或显式读取清单，再点击“开始比对”。同名默认配对，也可手动选择不同名表。清单只代表当前账号可见范围，不表示已检查整个库。
+
+按字段、索引、约束、触发器、表属性查看左右属性；原始定义页及触发器详情可复制完整 DDL。搜索和“只看差异”不会隐藏未读取、失败或不支持原因。只有全部必需类别完整且可比较时，才可能显示“结构相同”。
+
+读取只使用元数据，不读业务行、不生成或执行同步 SQL。取消、换连接或换库表后旧结果失效；重启恢复最近配对与导航宽度，不自动联网或恢复旧结论。读取期间窗口仍可操作，退出会提示结束后台任务。
+
+JSON 导出包含完整对象状态与差异，不受当前筛选影响。摘要不包含连接密码、主机或登录账号；对象的 DEFINER 仍作为结构属性保留，原始 DDL 不默认附在报告中。
+
+当前对明确的整表 SELECT/TRIGGER 授权证明元数据完整性；角色或复杂授权无法证明时保守提示受限。分区、未知特殊选项、仅大小写不同的歧义对象保持不支持，不猜测相同。实际数据库版本证据为本地 MySQL 8.0.46；其他版本不作未经验证的兼容承诺。
+
+## 检查命令
 
 ```sh
 npm --prefix frontend test
@@ -76,9 +88,16 @@ python3 tests/integration_probe.py \
   --mysql-home /Users/PopoY/Documents/DevTools/mysql/current \
   --app build/speed-sync-sql.app/Contents/MacOS/speed-sync-sql \
   --output .local/evidence/mysql-probe.json
+python3 tests/integration_schema.py \
+  --mysql-home /Users/PopoY/Documents/DevTools/mysql/current \
+  --app build/speed-sync-sql.app/Contents/MacOS/speed-sync-sql \
+  --output .local/evidence/d2-mysql.json \
+  --desktop-script tests/desktop_schema.mjs
 ```
 
 凭据测试使用随机临时目录产生的独立凭据键，结束清理。真实连接测试启动并销毁独立 MySQL 实例（随机 loopback 端口、临时数据目录），不连接现有数据库。输出不含随机测试密码。
+
+D2 集成脚本也只使用临时 MySQL 实例。可选桌面脚本会打开真实 Qt 窗口，以临时只读账号比对样本，使用随机 loopback 调试端口检查界面并保存截图；退出后清理实例。需 Node 24；当前复制审计使用 macOS AppKit/Swift，完整保留恢复剪贴板，辅助程序仅生成到 `.local/test-tools/`。不在正常启动开启调试。检查结果见 [D2 验证记录](docs/development/d2-validation.md)。
 
 开发用桌面冒烟检查：
 

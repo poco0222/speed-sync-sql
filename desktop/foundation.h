@@ -29,6 +29,11 @@ private:
     QHash<QString, QString> passwords;
     QHash<QString, QProcess *> jobs;
     QHash<QString, int> revisions;
+    quint64 schemaGeneration = 0;
+    QJsonObject comparison;
+    QString workspaceKey() const;
+    void invalidateSchema();
+    void schemaTask(const QString &id, const QString &operation, const QJsonObject &args);
     bool persist(const QJsonObject &next, QString &error);
     QJsonObject find(const QString &id) const;
     void reply(const QString &id, const QJsonObject &result);

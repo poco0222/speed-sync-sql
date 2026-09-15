@@ -1,6 +1,9 @@
 #include "foundation.h"
 #include "credentials.h"
+#include "schema.h"
 #include <QCoreApplication>
+#include <QClipboard>
+#include <QGuiApplication>
 #include <QCryptographicHash>
 #include <QDateTime>
 #include <QDir>
@@ -127,6 +130,7 @@ QJsonObject Foundation::find(const QString &id) const {
 }
 QJsonObject Foundation::snapshot() const {
     auto result = state;
+    result["workspace"] = state["workspaces"].toObject()[workspaceKey()].toObject();
     result["loadError"] = loadError;
     result["qtVersion"] = qVersion();
     result["driverAvailable"] = QSqlDatabase::isDriverAvailable("QMYSQL");
@@ -182,7 +186,7 @@ QJsonObject Foundation::execute(const QString &operation, const QJsonObject &arg
             }
             return failure(error, "storage");
         }
-        passwords[id] = password; ++revisions[id];
+        passwords[id] = password; ++revisions[id]; invalidateSchema();
         return success({{"state", snapshot()}, {"id", id}});
     }
     if (operation == "delete") {
@@ -205,13 +209,75 @@ QJsonObject Foundation::execute(const QString &operation, const QJsonObject &arg
             if (hadCredential) { QString restore; if (!Credentials::write(credentialKey(id), previous, restore)) error += "；凭据恢复失败"; }
             return failure(error, "storage");
         }
-        passwords.remove(id); ++revisions[id];
+        passwords.remove(id); ++revisions[id]; invalidateSchema();
     } else if (operation == "select") {
         auto side = args["side"].toString(); auto id = args["id"].toString();
         if ((side != "left" && side != "right") || (!id.isEmpty() && find(id).isEmpty())) return failure("连接选择无效", "validation");
         if (jobs.contains(side)) return failure("该端连接测试尚未结束");
         next[side] = id;
         if (!persist(next, error)) return failure(error, "storage");
+        invalidateSchema();
+    } else if (operation == "cancel-schema") {
+        invalidateSchema();
+        return success({{"cancelled", true}});
+    } else if (operation == "workspace") {
+        QJsonObject workspace;
+        for (auto side : {"left", "right"}) {
+            auto value = args[side].toObject();
+            for (auto field : {"database", "table"}) {
+                if (!value[field].isString() || value[field].toString().size() > 64 || value[field].toString().contains(QChar::Null)) return failure("库表选择无效", "validation");
+            }
+            workspace[side] = QJsonObject{{"database", value["database"]}, {"table", value["table"]}};
+        }
+        if (!integer(args["width"], 0, 600)) return failure("面板尺寸无效", "validation");
+        workspace["width"] = args["width"];
+        auto workspaces = state["workspaces"].toObject();
+        const auto previous = workspaces[workspaceKey()].toObject();
+        workspaces[workspaceKey()] = workspace; next["workspaces"] = workspaces;
+        if (!persist(next, error)) return failure(error, "storage");
+        if (previous["left"] != workspace["left"] || previous["right"] != workspace["right"]) invalidateSchema();
+    } else if (operation == "copy-schema") {
+        if (comparison.isEmpty()) return failure("比对结果已失效，请重新比对", "stale");
+        const auto side = args["side"].toString();
+        if (side != "left" && side != "right") return failure("连接端无效", "validation");
+        auto endpoint = comparison[side].toObject();
+        auto definition = endpoint["ddl"].toString();
+        if (args.contains("category")) {
+            definition.clear();
+            const auto items = endpoint["categories"].toObject()[args["category"].toString()].toObject()["items"].toArray();
+            for (auto value : items) if (value.toObject()["name"] == args["name"]) { definition = value.toObject()["ddl"].toString(); break; }
+        }
+        if (definition.isEmpty()) return failure("未读取到完整定义", "metadata");
+        QGuiApplication::clipboard()->setText(definition);
+        return success();
+    } else if (operation == "export-schema") {
+        if (comparison.isEmpty()) return failure("比对结果已失效，请重新比对", "stale");
+        const auto generation = schemaGeneration;
+        auto report = comparison;
+        for (auto side : {"left", "right"}) {
+            auto original = report[side].toObject();
+            QJsonObject endpoint;
+            for (auto field : {"database", "table", "version", "startedAt", "finishedAt", "existence"}) endpoint[field] = original[field];
+            endpoint["name"] = find(state[side].toString())["name"];
+            report[side] = endpoint;
+        }
+        // Raw definitions are available in the viewer; reports contain structured differences only.
+        auto rows = report["rows"].toArray();
+        for (qsizetype i = 0; i < rows.size(); ++i) {
+            auto row = rows[i].toObject(); row.remove("ddl");
+            for (auto side : {"left", "right"}) if (row[side].isObject()) {
+                auto value = row[side].toObject(); value.remove("ddl"); row[side] = value;
+            }
+            rows[i] = row;
+        }
+        report["rows"] = rows; report["formatVersion"] = 1;
+        report["generatedAt"] = QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
+        auto filename = QFileDialog::getSaveFileName(nullptr, "保存结构差异摘要", QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/schema-comparison.json", "JSON (*.json)");
+        if (filename.isEmpty()) return success({{"cancelled", true}});
+        if (generation != schemaGeneration) return failure("比对结果已失效，请重新比对", "stale");
+        QSaveFile file(filename); const auto bytes = QJsonDocument(report).toJson();
+        if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() || !file.commit()) return failure("差异摘要保存失败，请检查目标目录", "storage");
+        return success({{"cancelled", false}});
     } else if (operation == "settings") {
         if (!QStringList{"system", "light", "dark"}.contains(args["theme"].toString()) || !QStringList{"standard", "compact"}.contains(args["density"].toString()) || !integer(args["timeout"], 1, 60)) return failure("设置值无效", "validation");
         next["settings"] = QJsonObject{{"theme", args["theme"]}, {"density", args["density"]}, {"timeout", args["timeout"]}};
@@ -243,6 +309,7 @@ void Foundation::request(const QString &json) {
     if (id.isEmpty() || id.size() > 100) return;
     if (error.error != QJsonParseError::NoError || !o["args"].isObject()) { reply(id, failure("请求格式无效", "validation")); return; }
     if (o["operation"] == "test") test(id, o["args"].toObject());
+    else if (o["operation"] == "schema" || o["operation"] == "compare") schemaTask(id, o["operation"].toString(), o["args"].toObject());
     else reply(id, execute(o["operation"].toString(), o["args"].toObject()));
 }
 void Foundation::test(const QString &id, QJsonObject args) {
@@ -299,4 +366,68 @@ void Foundation::test(const QString &id, QJsonObject args) {
     process->setProgram(QCoreApplication::applicationFilePath()); process->setArguments({"--probe"});
     process->start(); timer->start((c["timeout"].toInt(10) + 5) * 1000); emit activityChanged();
 }
-void Foundation::stopJobs() { for (auto process : jobs) process->kill(); }
+QString Foundation::workspaceKey() const {
+    return state["left"].toString() + ":" + state["right"].toString();
+}
+void Foundation::invalidateSchema() {
+    ++schemaGeneration; comparison = {};
+    for (auto it = jobs.cbegin(); it != jobs.cend(); ++it) if (it.key().startsWith("schema:")) {
+        it.value()->setProperty("cancelled", true); it.value()->kill();
+    }
+}
+void Foundation::schemaTask(const QString &id, const QString &operation, const QJsonObject &args) {
+    if (!loadError.isEmpty()) { reply(id, failure(loadError, "storage")); return; }
+    const bool comparing = operation == "compare";
+    const auto side = args["side"].toString();
+    if (!comparing && (side != "left" && side != "right")) { reply(id, failure("连接端无效", "validation")); return; }
+    if (!comparing && !QStringList{"databases", "tables"}.contains(args["action"].toString())) { reply(id, failure("读取操作无效", "validation")); return; }
+    for (auto it = jobs.cbegin(); it != jobs.cend(); ++it) if (it.key().startsWith("schema:") && !it.value()->property("cancelled").toBool()) {
+        if (comparing || it.value()->property("comparing").toBool() || it.value()->property("side").toString() == side) {
+            reply(id, failure("该端已有读取任务，请等待或取消", "busy")); return;
+        }
+    }
+    QJsonObject payload{{"operation", operation}, {"args", args}};
+    for (const auto &endpoint : comparing ? QStringList{"left", "right"} : QStringList{side}) {
+        auto c = find(state[endpoint].toString());
+        if (c.isEmpty()) { reply(id, failure("请先选择连接", "validation")); return; }
+        if (comparing || args["action"] == "tables") {
+            auto selected = comparing ? args[endpoint].toObject() : args;
+            for (const auto &field : comparing ? QStringList{"database", "table"} : QStringList{"database"}) {
+                auto value = selected[field];
+                if (!value.isString() || value.toString().isEmpty() || value.toString().size() > 64 || value.toString().contains(QChar::Null)) { reply(id, failure("请选择有效库表", "validation")); return; }
+            }
+        }
+        QString error;
+        c["password"] = c["remember"].toBool() ? Credentials::read(credentialKey(c["id"].toString()), error) : passwords.value(c["id"].toString());
+        if (!error.isEmpty()) { reply(id, failure(error, "credentials")); return; }
+        if (c["timeout"].isNull() || c["timeout"].isUndefined()) c["timeout"] = state["settings"].toObject()["timeout"];
+        // Catalog browsing must work even when the saved default database was removed.
+        c["database"] = ""; payload[endpoint] = c;
+    }
+    if (comparing) { ++schemaGeneration; comparison = {}; }
+    const auto generation = schemaGeneration;
+    const auto lane = "schema:" + id;
+    auto process = new QProcess(this); jobs[lane] = process;
+    process->setProperty("comparing", comparing); process->setProperty("side", side);
+    auto timer = new QTimer(process); timer->setSingleShot(true);
+    const auto input = QJsonDocument(payload).toJson(QJsonDocument::Compact);
+    connect(process, &QProcess::started, this, [process, input]() { process->write(input); process->closeWriteChannel(); });
+    connect(timer, &QTimer::timeout, process, [process]() { process->setProperty("timedOut", true); process->kill(); });
+    connect(process, &QProcess::errorOccurred, this, [this, process, id, lane](QProcess::ProcessError error) {
+        if (error == QProcess::FailedToStart) { jobs.remove(lane); reply(id, failure("无法启动元数据读取进程", "process")); process->deleteLater(); emit activityChanged(); }
+    });
+    connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this, [this, process, timer, generation, comparing, id, lane](int exit, QProcess::ExitStatus status) {
+        timer->stop(); jobs.remove(lane);
+        auto result = QJsonDocument::fromJson(process->readAllStandardOutput()).object();
+        if (process->property("cancelled").toBool()) result = {{"ok", false}, {"cancelled", true}, {"code", "cancelled"}, {"error", "读取已取消"}};
+        else if (process->property("timedOut").toBool()) result = failure("元数据读取超时，请重试或缩小范围", "timeout");
+        else if (status != QProcess::NormalExit || exit != 0 || !result.contains("ok")) result = failure("元数据读取进程异常结束", "process");
+        const bool stale = generation != schemaGeneration;
+        result["stale"] = stale;
+        if (!stale && comparing && result["ok"].toBool()) comparison = result["comparison"].toObject();
+        reply(id, result); process->deleteLater(); emit activityChanged();
+    });
+    process->setProgram(QCoreApplication::applicationFilePath()); process->setArguments({"--schema"});
+    process->start(); timer->start(comparing ? 120000 : 65000); emit activityChanged();
+}
+void Foundation::stopJobs() { invalidateSchema(); for (auto process : jobs) process->kill(); }

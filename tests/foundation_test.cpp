@@ -10,6 +10,23 @@ class FoundationTest : public QObject {
     Q_OBJECT
     QJsonObject connection() { return {{"name", "本地测试"}, {"host", "127.0.0.1"}, {"port", 3306}, {"user", "test"}, {"password", "test-secret-NEVER-PERSIST"}, {"database", ""}, {"tls", "preferred"}, {"ca", ""}, {"remember", false}, {"timeout", QJsonValue::Null}}; }
 private slots:
+    void recentWorkspaceIsLocalAndScoped() {
+        QTemporaryDir dir; Foundation service(dir.path());
+        QJsonValue a = service.execute("save", connection())["id"];
+        QJsonValue b = service.execute("save", connection())["id"];
+        QVERIFY(service.execute("select", {{"side", "left"}, {"id", a}})["ok"].toBool());
+        QVERIFY(service.execute("select", {{"side", "right"}, {"id", b}})["ok"].toBool());
+        QJsonObject selection{{"left", QJsonObject{{"database", "left_db"}, {"table", "t"}}}, {"right", QJsonObject{{"database", "right_db"}, {"table", "other"}}}, {"width", 240}};
+        QVERIFY(service.execute("workspace", selection)["ok"].toBool());
+        QVERIFY(!service.busy());
+        Foundation restarted(dir.path()); QCOMPARE(restarted.snapshot()["workspace"].toObject(), selection);
+        QCOMPARE(restarted.execute("export-schema", {})["code"].toString(), QString("stale"));
+        QVERIFY(service.execute("select", {{"side", "right"}, {"id", a}})["ok"].toBool());
+        QVERIFY(service.snapshot()["workspace"].toObject().isEmpty());
+        selection["width"] = 10000; QVERIFY(!service.execute("workspace", selection)["ok"].toBool());
+        selection["width"] = 240; selection["left"] = QJsonObject{{"database", QString(65, 'a')}, {"table", "t"}};
+        QVERIFY(!service.execute("workspace", selection)["ok"].toBool());
+    }
     void configLifecycle() {
         QTemporaryDir dir;
         Foundation service(dir.path());

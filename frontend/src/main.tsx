@@ -4,6 +4,7 @@ import { Alert, Button, Checkbox, Collapse, ConfigProvider, Drawer, Empty, Form,
 import zhCN from 'antd/locale/zh_CN';
 import { request, type Connection, type State, type Settings, type TestResult } from './bridge';
 import { Freshness } from './freshness';
+import { SchemaWorkbench, type SchemaHandle } from './SchemaWorkbench';
 import './style.css';
 const { Text, Title } = Typography;
 const blank = (): Connection => ({ name: '', host: '', port: 3306, user: '', database: '', remember: false, tls: 'preferred', ca: '', timeout: null, password: '' });
@@ -30,6 +31,7 @@ function Application() {
   const [systemDark, setSystemDark] = useState(matchMedia('(prefers-color-scheme: dark)').matches);
   const [form] = Form.useForm<Connection>();
   const freshness = useRef(new Freshness());
+  const schemaWorkbench = useRef<SchemaHandle>(null);
   const [message, messageHolder] = messageService.useMessage();
   const [modal, modalHolder] = Modal.useModal();
   const running = Object.values(busy).some(Boolean);
@@ -58,6 +60,7 @@ function Application() {
   };
   const report = (error: unknown) => { void message.error(error instanceof Error ? error.message : '操作失败'); };
   const openEditor = (connection?: Connection, copy = false) => {
+    if (connection && !copy) schemaWorkbench.current?.invalidate();
     freshness.current.invalidate('editor'); setEditorResult(undefined);
     const value = connection ? { ...connection, ...(copy ? { id: undefined, name: `${connection.name} 副本`, remember: false, password: '' } : { password: undefined }), lastTest: undefined } : blank();
     setEditing(value); form.resetFields(); form.setFieldsValue(value); setDrawerOpen(true);
@@ -84,16 +87,18 @@ function Application() {
   const save = async () => {
     let value: Connection;
     try { value = { ...editing!, ...await form.validateFields() }; } catch { return; }
+    schemaWorkbench.current?.invalidate();
     setSaving(true);
     try { await action('save', value); closeEditor(); void message.success('连接已保存'); }
     catch (error) { report(error); } finally { setSaving(false); }
   };
   const select = async (side: 'left' | 'right', id: string) => {
+    schemaWorkbench.current?.invalidate();
     freshness.current.invalidate(side);
     try { await action('select', { side, id }); } catch (error) { report(error); }
   };
   const remove = (connection: Connection) => {
-    modal.confirm({ title: `删除“${connection.name}”？`, content: '仅删除本地连接配置及记住的密码，不影响数据库。', okText: '删除配置', okButtonProps: { danger: true }, cancelText: '取消', onOk: async () => { try { await action('delete', { id: connection.id }); } catch (error) { report(error); throw error; } } });
+    modal.confirm({ title: `删除“${connection.name}”？`, content: '仅删除本地连接配置及记住的密码，不影响数据库。', okText: '删除配置', okButtonProps: { danger: true }, cancelText: '取消', onOk: async () => { schemaWorkbench.current?.invalidate(); try { await action('delete', { id: connection.id }); } catch (error) { report(error); throw error; } } });
   };
   const endpoint = (side: 'left' | 'right') => {
     const connection = state.connections.find(item => item.id === state[side]);
@@ -109,10 +114,11 @@ function Application() {
       <main>
         {(fatal || state.loadError) && <Alert className="banner" type="error" showIcon title={fatal || state.loadError} />}
         {!fatal && !booting && !state.driverAvailable && <Alert className="banner" type="warning" showIcon title="QMYSQL 驱动未就绪" description="可先保存连接配置。连接测试需要安装匹配的 MySQL 驱动及客户端库。" />}
-        {page === 'workbench' ? <>
+        {<div style={{ display: page === 'workbench' ? 'contents' : 'none' }}>
           <div className="connection-bar">{endpoint('left')}<div className="connection-divider" />{endpoint('right')}</div>
-          <section className="workbench-empty"><div className="workspace-caption"><span>工作台</span><Text type="secondary">单表结构与数据工具</Text></div><div className="empty-center"><div className="pair-symbol" aria-hidden="true"><span>左</span><i>↔</i><span>右</span></div><Title level={3}>{state.connections.length ? '已保存连接，请选择左右两端' : '先配置两端数据库'}</Title><p>保存常用连接，分别确认左侧与右侧可达。</p><p className="subtle">当前版本提供连接管理与测试，尚未执行任何比对。</p><Button type="primary" disabled={unavailable} onClick={() => openEditor()}>新建连接</Button></div><div className="workspace-note"><span className="status-dot" />{booting ? '正在初始化桌面连接…' : '连接测试仅读取服务器信息，不修改数据库'}</div></section>
-        </> : <section className="connections-page"><div className="page-heading"><div><div className="eyebrow">连接管理</div><Title level={3}>常用数据库</Title><Text type="secondary">保存配置与测试连接相互独立。</Text></div><Space wrap><Button disabled={unavailable} onClick={() => { void action('export', {}).then(result => { if (!result.cancelled) void message.success('诊断摘要已保存'); }).catch(report); }}>导出诊断</Button><Button type="primary" disabled={unavailable} onClick={() => openEditor()}>新建连接</Button></Space></div>
+          {!booting && <SchemaWorkbench ref={schemaWorkbench} key={JSON.stringify([state.left, state.right, ...state.connections.filter(c => c.id === state.left || c.id === state.right).map(({ lastTest, ...connection }) => connection)])} state={state} disabled={unavailable} />}
+        </div>}
+        {page === 'connections' && <section className="connections-page"><div className="page-heading"><div><div className="eyebrow">连接管理</div><Title level={3}>常用数据库</Title><Text type="secondary">保存配置与测试连接相互独立。</Text></div><Space wrap><Button disabled={unavailable} onClick={() => { void action('export', {}).then(result => { if (!result.cancelled) void message.success('诊断摘要已保存'); }).catch(report); }}>导出诊断</Button><Button type="primary" disabled={unavailable} onClick={() => openEditor()}>新建连接</Button></Space></div>
           <Table<Connection> rowKey="id" dataSource={state.connections} pagination={false} scroll={{ x: 920 }} locale={{ emptyText: <Empty description="还没有保存的连接"><Button onClick={() => openEditor()} disabled={unavailable}>添加第一个连接</Button></Empty> }} columns={[
             { title: '连接名称', dataIndex: 'name', width: 190, render: (name, c) => <Button type="link" className="name-button" onClick={() => openEditor(c)}>{name}</Button> },
             { title: '服务器', key: 'server', width: 230, render: (_, c) => <div><span className="mono">{c.host}:{c.port}</span><div className="subtle">{c.database || '未指定默认数据库'}</div></div> },

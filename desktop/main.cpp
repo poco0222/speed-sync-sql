@@ -1,4 +1,5 @@
 #include "foundation.h"
+#include "schema.h"
 #include <QApplication>
 #include <QCloseEvent>
 #include <QDir>
@@ -44,9 +45,9 @@ public:
         if (!bridge->busy()) { event->accept(); return; }
         event->ignore();
         if (closing) return;
-        QMessageBox question(QMessageBox::Question, "结束连接测试", "仍有连接测试运行。结束测试并退出？", QMessageBox::Yes | QMessageBox::No, this);
+        QMessageBox question(QMessageBox::Question, "结束后台任务", "仍有连接测试或结构读取运行。结束任务并退出？", QMessageBox::Yes | QMessageBox::No, this);
         question.button(QMessageBox::Yes)->setText("结束并退出");
-        question.button(QMessageBox::No)->setText("继续测试");
+        question.button(QMessageBox::No)->setText("继续运行");
         question.setDefaultButton(QMessageBox::No);
         if (question.exec() == QMessageBox::Yes) {
             closing = true; bridge->stopJobs();
@@ -56,7 +57,8 @@ public:
 };
 int main(int argc, char **argv) {
     bool probe = argc > 1 && QByteArray(argv[1]) == "--probe";
-    if (probe) {
+    bool schema = argc > 1 && QByteArray(argv[1]) == "--schema";
+    if (probe || schema) {
         QCoreApplication app(argc, argv);
         QCoreApplication::addLibraryPath(QCoreApplication::applicationDirPath() + "/plugins");
         QFile input; if (!input.open(stdin, QIODevice::ReadOnly)) return 1;
@@ -66,7 +68,18 @@ int main(int argc, char **argv) {
         const auto document = QJsonDocument::fromJson(bytes, &error);
         if (bytes.size() > 32768 || error.error != QJsonParseError::NoError || !document.isObject()) result = {{"ok", false}, {"code", "validation"}, {"error", "请求格式无效"}};
         else {
-            auto worker = QThread::create([&]() { result = probeDatabase(document.object()); });
+            auto worker = QThread::create([&]() {
+                if (probe) { result = probeDatabase(document.object()); return; }
+                auto input = document.object(); auto args = input["args"].toObject();
+                if (input["operation"] == "compare") {
+                    auto l = args["left"].toObject(); l["action"] = "snapshot";
+                    auto r = args["right"].toObject(); r["action"] = "snapshot";
+                    const auto left = readSchema(input["left"].toObject(), l);
+                    const auto right = readSchema(input["right"].toObject(), r);
+                    result = {{"ok", true}, {"comparison", compareSchemas(left, right)}};
+                } else if (input["operation"] == "schema") result = readSchema(input[args["side"].toString()].toObject(), args);
+                else result = {{"ok", false}, {"code", "validation"}, {"error", "读取操作无效"}};
+            });
             worker->start(); worker->wait(); delete worker;
         }
         QFile output; if (!output.open(stdout, QIODevice::WriteOnly)) return 1;
