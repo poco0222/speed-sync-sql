@@ -1,0 +1,218 @@
+schema: comet.native.v4
+name: data-merge
+language: zh-CN
+phase: archive
+status: done
+state_version: 16
+brief: brief.md
+shape_confirmation_hash: 9073905523da1daedb800b0bd72810ed120fa9f320cfa1763896ebd7b6fcfd1f
+spec_changes:
+  - capability: data-merge
+    operation: create
+    source: specs/data-merge/spec.md
+workspace:
+  isolation: current
+  change_branch: main
+  target_branch: main
+  finish: null
+loop:
+  stage: done
+  goal_cycle: 2
+  iteration: 2
+  attempt: 2
+  retry_epoch: 0
+  failed_iteration_count: 1
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: null
+acceptance:
+  - id: A1
+    source: brief.md
+    text: A1：左右两个方向均能生成计划；默认补齐只插入缺失键，合并另更新同键的选定差异字段，键值和目标独有记录始终保留；非选定字段不被更新。
+    result: passed
+    reason:
+      text: buildMerge/changedFields仅计划源缺失记录及选定非键差异；Runtime双向fill/merge保留目标独有、未选字段及目标键字节。
+      truncated: false
+  - id: A2
+    source: brief.md
+    text: A2：未完整扫描、无可靠键、字段/必填列/生成列/唯一约束不兼容或非 InnoDB
+      时明确阻止写入；可空列、默认值、自增和生成列按真实目标定义处理，不通过隐式截断或重置规避错误。
+    result: passed
+    reason:
+      text: 完整扫描、可靠键、结构兼容、InnoDB、必填/生成列及依赖可见性门禁已核对；拒绝场景实测通过。
+      truncated: false
+  - id: A3
+    source: brief.md
+    text: A3：预览显示目标别名/库表、方向、模式、键、范围、字段、读取时间、增改计数、分页操作与参数化语句样例；仅预览不写库，一次摘要确认才执行，重复请求不重复执行。
+    result: passed
+    reason:
+      text: Qt预览目标/范围/时间/计数/分页/SQL；原生confirmed+计划身份与消费防重放；真实Qt一次确认和重复拒绝通过。
+      truncated: false
+  - id: A4
+    source: brief.md
+    text: A4：写入前核对结构和目标预期旧值；目标已改、已删、缺失键已出现或范围外同键均报告冲突，当前批次回滚并停止后续批次；不覆盖并发变化，不自动重试。
+    result: passed
+    reason:
+      text: 事务持目标MDL、结构重核、全目标键FOR UPDATE及完整旧值校验；各种并发/范围外键/漂移实库整批回滚通过。
+      truncated: false
+  - id: A5
+    source: brief.md
+    text: A5：多批事务中仅已确认提交的批次计入成功；SQL
+      失败回滚当前批次，保留先前提交；停止在可控边界生效，未执行项可区分；提交响应丢失或进程异常标结果待核实。
+    result: passed
+    reason:
+      text: 仅累计明确提交，失败停止后批、未知标unknown。600项3批、后批冲突保留256项、800项边界停止通过；fixture覆盖提交未知/进程异常。
+      truncated: false
+  - id: A6
+    source: brief.md
+    text: A6：BIGINT、DECIMAL、NULL、空串、二进制、微秒时间和长值写入保真；使用完整缓存值、正确标识符与参数绑定；触发器及外键保持启用，预览披露可见副作用，约束失败可解释。
+    result: passed
+    reason:
+      text: 完整缓存与严格参数绑定保真，实库精确类型与CHECK回滚通过；安全触发器启用披露，跨表/大小写写键/引用列级联拒绝。
+      truncated: false
+  - id: A7
+    source: brief.md
+    text: A7：连接/表/方向/字段/范围变化及结构执行使旧计划失效；执行期间锁定上下文并保护退出；记录保存摘要、批次及错误状态而非整表业务值，重启不恢复可执行计划，未完成记录标待核实。
+    result: passed
+    reason:
+      text: 连接/扫描身份和generation使旧计划失效；上下文锁/结构互斥、脱敏摘要记录、退出/保存失败/重启unknown生命周期通过。
+      truncated: false
+  - id: A8
+    source: brief.md
+    text: A8：执行后可按原上下文重新比对，分别显示执行结果和复核差异；真实 Qt 数据页完成预览、确认、执行、停止/失败反馈和记录查看，既有 D3/D4
+      回归检查通过。
+    result: passed
+    reason:
+      text: D5真实Qt10项含预览/确认/执行/停止/复核/记录，执行与差异分开；D3实库14项通过；最新Runtime D4 exit0
+        8513ms，18Qt与只读审计通过。测试仅增加动画/遮挡/选中值/弹层等待，无断言削弱。
+      truncated: false
+builder_handoff:
+  candidate_id: 833e12a6-e009-4b02-89e9-3062025a3416
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:7241ae22-5d57-49c9-add4-6b571ef0572b
+  iteration: 2
+  summary:
+    text: 仅修复 A8 D4 Qt
+      回归选择密度的点击时序：等modal动画与可见命中目标，选后等值与popup关闭；无业务代码变更，不削弱断言。A1–A7保持原实现。
+    truncated: false
+  addressed_acceptance_ids:
+    - A8
+  checks:
+    - name:
+        text: d4-repair
+        truncated: false
+      result: passed
+      note:
+        text: 完整独立MySQL/Qt/只读审计通过，.local/evidence/d5-d4-repair.json；node --check通过
+        truncated: false
+  checks_truncated: false
+  known_limits:
+    - text: 沿用此前平台、COMMIT链路注入、规模限制；D4选项选择沿用DOM click，打开控件是CDP鼠标事件
+      truncated: false
+  known_limits_truncated: false
+  review:
+    status: passed
+    summary:
+      text: 新一轮独立只读审查selectOption等待条件，不跳过/吞掉失败，保留真实Qt交互，业务无变化。
+      truncated: false
+    reviewer_execution_ref: candidate-review-d5-20260915-01a0a439-r2
+  submitted_at: 2026-09-15T09:32:43.626Z
+blockers: []
+verification:
+  candidate_id: 833e12a6-e009-4b02-89e9-3062025a3416
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:b6175089-5ed4-4f8d-bdc2-15972bd58ff6
+  iteration: 2
+  attempt: 2
+  assurance: skill-coordinated
+  verdict: pass
+  checks:
+    - id: d4-regression
+      name:
+        text: d4-regression
+        truncated: false
+      argv_display:
+        - text: tests/integration_data.py
+          truncated: false
+        - text: --mysql-home
+          truncated: false
+        - text: /Users/PopoY/Documents/DevTools/mysql/current
+          truncated: false
+        - text: --app
+          truncated: false
+        - text: build/speed-sync-sql.app/Contents/MacOS/speed-sync-sql
+          truncated: false
+        - text: --output
+          truncated: false
+        - text: .local/evidence/d5-runtime-d4.json
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 8513
+  summary:
+    text: 独立只读最终全量核验brief/spec、实现、Runtime日志与证据，最后对照Builder交接。A1–A8全部通过，无新阻塞；原A8失败记录保留，修复后Runtime通过。未写文件、未自行跑检查、未接受结果。
+    truncated: false
+  risks:
+    - text: Windows10 x64/最低macOS15/干净机器发行NOT RUN
+      truncated: false
+    - text: 真实网络COMMIT响应丢失注入NOT RUN，unknown由审查和fixture支持
+      truncated: false
+    - text: 实测最多800项D5、2500行D4，不推断百万行吞吐
+      truncated: false
+  risks_truncated: false
+  completed_at: 2026-09-15T09:38:14.931Z
+history:
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 0
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Native Shape artifacts changed
+      truncated: false
+    completed_at: 2026-09-15T09:23:33.318Z
+  - goal_cycle: 2
+    iteration: 1
+    attempt: 1
+    outcome: fail
+    unresolved_ids:
+      - A8
+    summary:
+      text: 独立只读Verifier A1-A7 passed，A8 failed；先核对brief/spec/实现/Runtime证据，后参考Builder。
+      truncated: false
+    completed_at: 2026-09-15T09:30:54.183Z
+  - goal_cycle: 2
+    iteration: 2
+    attempt: 1
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Repair verification passed for A8; final full verification is required.
+      truncated: false
+    completed_at: 2026-09-15T09:35:44.805Z
+  - goal_cycle: 2
+    iteration: 2
+    attempt: 2
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: 独立只读最终全量核验brief/spec、实现、Runtime日志与证据，最后对照Builder交接。A1–A8全部通过，无新阻塞；原A8失败记录保留，修复后Runtime通过。未写文件、未自行跑检查、未接受结果。
+      truncated: false
+    completed_at: 2026-09-15T09:38:14.931Z
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pass
+verification_report: verification.md
+archived: true
+created_at: 2026-09-15T08:41:13.070Z
