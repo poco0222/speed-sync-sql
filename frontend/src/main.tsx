@@ -20,6 +20,7 @@ function Application() {
   const [booting, setBooting] = useState(true);
   const [fatal, setFatal] = useState('');
   const [syncRunning, setSyncRunning] = useState(false);
+  const [dataRunning, setDataRunning] = useState(false);
   const [restoreKey, setRestoreKey] = useState(0);
   const [page, setPage] = useState('workbench');
   const [editing, setEditing] = useState<Connection | null>(null);
@@ -119,7 +120,7 @@ function Application() {
         {!fatal && !booting && !state.driverAvailable && <Alert className="banner" type="warning" showIcon title="QMYSQL 驱动未就绪" description="可先保存连接配置。连接测试需要安装匹配的 MySQL 驱动及客户端库。" />}
         {<div style={{ display: page === 'workbench' ? 'contents' : 'none' }}>
           <div className="connection-bar">{endpoint('left')}<div className="connection-divider" />{endpoint('right')}</div>
-          {!booting && <SchemaWorkbench ref={schemaWorkbench} key={JSON.stringify([restoreKey, state.left, state.right, ...state.connections.filter(c => c.id === state.left || c.id === state.right).map(({ lastTest, ...connection }) => connection)])} state={state} disabled={unavailable} onRunning={setSyncRunning} />}
+          {!booting && <SchemaWorkbench ref={schemaWorkbench} key={JSON.stringify([restoreKey, state.left, state.right, ...state.connections.filter(c => c.id === state.left || c.id === state.right).map(({ lastTest, ...connection }) => connection)])} state={state} disabled={unavailable} onRunning={setSyncRunning} onDataRunning={setDataRunning} />}
         </div>}
         {page === 'records' && <SyncRecords disabled={unavailable} onRestore={next => { schemaWorkbench.current?.invalidate(); setState(next); setRestoreKey(value => value + 1); setPage('workbench'); }} />}
         {page === 'connections' && <section className="connections-page"><div className="page-heading"><div><div className="eyebrow">连接管理</div><Title level={3}>常用数据库</Title><Text type="secondary">保存配置与测试连接相互独立。</Text></div><Space wrap><Button disabled={unavailable} onClick={() => { void action('export', {}).then(result => { if (!result.cancelled) void message.success('诊断摘要已保存'); }).catch(report); }}>导出诊断</Button><Button type="primary" disabled={unavailable} onClick={() => openEditor()}>新建连接</Button></Space></div>
@@ -131,7 +132,7 @@ function Application() {
           ]} />
         </section>}
       </main>
-      <footer><span>{syncRunning ? '结构同步执行中' : Object.values(busy).some(Boolean) ? '连接测试进行中' : '当前无运行任务'}</span><span>本地桌面应用</span></footer>
+      <footer><span>{syncRunning ? '结构同步执行中' : dataRunning ? '数据读取 / 比对进行中' : Object.values(busy).some(Boolean) ? '连接测试进行中' : '当前无运行任务'}</span><span>本地桌面应用</span></footer>
       <Drawer title={editing?.id ? '编辑连接' : '新建连接'} open={drawerOpen} onClose={closeEditor} width={480} maskClosable={!saving} closable={!saving} extra={<Button disabled={saving} onClick={closeEditor}>取消</Button>} footer={<div className="drawer-footer"><Button loading={busy.editor} disabled={saving} onClick={() => void test('editor')}>测试连接</Button><Button type="primary" loading={saving} onClick={() => void save()}>保存连接</Button></div>}>
         <Form form={form} layout="vertical" requiredMark="optional" onValuesChange={() => { freshness.current.invalidate('editor'); setEditorResult(undefined); }}>
           <Form.Item name="name" label="连接名称" rules={[{ required: true, whitespace: true, message: '输入便于辨认的连接名称' }, { max: 255 }]}><Input placeholder="例如：开发环境" maxLength={255} /></Form.Item>

@@ -1,6 +1,7 @@
 #include "foundation.h"
 #include "schema.h"
 #include "sync_process.h"
+#include "data.h"
 #include <QApplication>
 #include <QCloseEvent>
 #include <QDir>
@@ -59,7 +60,8 @@ public:
 int main(int argc, char **argv) {
     bool probe = argc > 1 && QByteArray(argv[1]) == "--probe";
     bool schema = argc > 1 && QByteArray(argv[1]) == "--schema";
-    if (probe || schema) {
+    bool data = argc > 1 && QByteArray(argv[1]) == "--data";
+    if (probe || schema || data) {
         QCoreApplication app(argc, argv);
         QCoreApplication::addLibraryPath(QCoreApplication::applicationDirPath() + "/plugins");
         QFile input; if (!input.open(stdin, QIODevice::ReadOnly)) return 1;
@@ -70,6 +72,7 @@ int main(int argc, char **argv) {
         if (bytes.size() > (schema ? 16 * 1024 * 1024 : 32768) || error.error != QJsonParseError::NoError || !document.isObject()) result = {{"ok", false}, {"code", "validation"}, {"error", "请求格式无效"}};
         else {
             auto worker = QThread::create([&]() {
+                if (data) { result = runDataCommand(document.object()); return; }
                 if (probe) { result = probeDatabase(document.object()); return; }
                 auto input = document.object(); auto args = input["args"].toObject();
                 if (input["operation"].toString().contains("sync")) { result = runSyncCommand(input); return; }

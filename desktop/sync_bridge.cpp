@@ -177,6 +177,7 @@ QJsonObject Foundation::syncOperation(const QString &operation, const QJsonObjec
     for (qsizetype i = 0; i < steps.size(); ++i) { auto step = steps[i].toObject(); step["status"] = "pending"; steps[i] = step; }
     syncRecord["steps"] = steps;
     if (!saveSyncRecord()) { syncRecord["status"] = "blocked"; syncRecord["error"] = "原结构及初始记录保存失败，未执行数据库写入"; saveSyncRecord(); syncPayload = {}; return fail(syncRecord["error"].toString(), "storage"); }
+    invalidateData();
     syncExecuting = true; syncStop = false; syncStep = 0;
     syncPayload["operation"] = "sync-check"; syncPayload["expected"] = syncRecord["snapshots"];
     syncPlan = {}; comparison = {}; ++schemaGeneration;

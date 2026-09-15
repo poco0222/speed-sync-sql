@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 're
 import { Alert, AutoComplete, Button, Checkbox, Empty, Input, Slider, Space, Table, Tabs, Tag, Typography, message as messageService } from 'antd';
 import { request, type State } from './bridge';
 import { SyncPanel } from './SyncPanel';
+import { DataWorkbench, type DataHandle } from './DataWorkbench';
 import { rowKey, selectionReason, selectVisible } from './sync';
 import { Freshness } from './freshness';
 import { categories, filterRows, pairTable, propertyRows, statusLabels, summary, type Comparison, type SchemaRow, type Side, type Workspace } from './schema';
@@ -12,11 +13,16 @@ const sideLabel = (side: Side) => side === 'left' ? '左侧' : '右侧';
 const format = (value: unknown): string => value === undefined ? '—' : typeof value === 'string' ? value : JSON.stringify(value, null, 2);
 const statusColor = (status: string) => ({ same: 'success', different: 'warning', 'left-only': 'blue', 'right-only': 'purple', failed: 'error', unsupported: 'orange' }[status]);
 
-export const SchemaWorkbench = forwardRef<SchemaHandle, { state: State; disabled: boolean; onRunning: (running: boolean) => void }>(function SchemaWorkbench({ state, disabled, onRunning }, ref) {
+export const SchemaWorkbench = forwardRef<SchemaHandle, { state: State; disabled: boolean; onRunning: (running: boolean) => void; onDataRunning: (running: boolean) => void }>(function SchemaWorkbench({ state, disabled, onRunning, onDataRunning }, ref) {
   const [workspace, setWorkspace] = useState<Workspace>(() => ({ left: state.workspace?.left ?? { database: state.connections.find(c => c.id === state.left)?.database ?? '', table: '' }, right: state.workspace?.right ?? { database: state.connections.find(c => c.id === state.right)?.database ?? '', table: '' }, width: state.workspace?.width ?? 280 }));
   const [lists, setLists] = useState<Record<string, { name: string; type?: string }[]>>({});
   const [comparison, setComparison] = useState<Comparison>();
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  const [mode, setMode] = useState('schema');
+  const [dataOpened, setDataOpened] = useState(false);
+  const syncWasRunning = useRef(false);
+  const [dataEpoch, setDataEpoch] = useState(0);
+  const dataWorkbench = useRef<DataHandle>(null);
   const [category, setCategory] = useState('columns');
   const [search, setSearch] = useState('');
   const [differences, setDifferences] = useState(false);
@@ -30,7 +36,9 @@ export const SchemaWorkbench = forwardRef<SchemaHandle, { state: State; disabled
   const pendingWorkspace = useRef<Promise<void>>(Promise.resolve());
   const [message, messageHolder] = messageService.useMessage();
   const report = (error: unknown) => void message.error(error instanceof Error ? error.message : '操作失败');
+  const invalidateData = () => { dataWorkbench.current?.invalidate(); setDataEpoch(value => value + 1); };
   const invalidate = () => {
+    invalidateData();
     freshness.current.invalidate('schema');
     setComparison(undefined); setSelectedKeys([]); setBusy(''); setNotice(undefined);
     void request('cancel-schema').catch(report);
@@ -101,7 +109,8 @@ export const SchemaWorkbench = forwardRef<SchemaHandle, { state: State; disabled
   const definition = (side: Side) => <section className="definition"><div className="definition-heading"><strong>{sideLabel(side)} · {identity(side)}</strong><Button size="small" disabled={!comparison?.[side].ddl} onClick={() => void copy(side)}>复制完整定义</Button></div><pre tabIndex={0}>{comparison?.[side].ddl || '未读取到原始定义'}</pre><Typography.Text type="secondary">MySQL {comparison?.[side].version ?? '未知'} · 开始 {comparison?.[side].startedAt ?? '未知'} · 结束 {comparison?.[side].finishedAt ?? '未知'}</Typography.Text></section>;
   return <section className="schema-workbench">
     {messageHolder}
-    <div className="schema-toolbar"><Space wrap><Button onClick={() => setCollapsed(value => !value)}>{collapsed ? '展开库表导航' : '收起库表导航'}</Button><Typography.Text strong>单表结构比对</Typography.Text><Tag>比对只读 · 同步需确认</Tag></Space><Space wrap><Button disabled={disabled || !selected || !!busy} type="primary" onClick={() => void run('compare', { left: workspace.left, right: workspace.right }, '正在读取两端元数据并比对')}>{comparison ? '刷新比对' : '开始比对'}</Button>{busy && <Button onClick={() => { invalidate(); setNotice({ type: 'info', text: '已取消读取，旧结果已失效。' }); }}>取消读取</Button>}<Button disabled={!comparison || !!busy || disabled} loading={exporting} onClick={() => void exportSummary()}>导出 JSON 摘要</Button></Space></div>
+    <Tabs activeKey={mode} onChange={value => { setMode(value); if (value === "data") setDataOpened(true); }} items={[{key:"schema",label:"结构比对"},{key:"data",label:"数据比对"}]} />
+    <div className="schema-toolbar" style={{display:mode === "schema" ? undefined : "none"}}><Space wrap><Button onClick={() => setCollapsed(value => !value)}>{collapsed ? '展开库表导航' : '收起库表导航'}</Button><Typography.Text strong>单表结构比对</Typography.Text><Tag>比对只读 · 同步需确认</Tag></Space><Space wrap><Button disabled={disabled || !selected || !!busy} type="primary" onClick={() => void run('compare', { left: workspace.left, right: workspace.right }, '正在读取两端元数据并比对')}>{comparison ? '刷新比对' : '开始比对'}</Button>{busy && <Button onClick={() => { invalidate(); setNotice({ type: 'info', text: '已取消读取，旧结果已失效。' }); }}>取消读取</Button>}<Button disabled={!comparison || !!busy || disabled} loading={exporting} onClick={() => void exportSummary()}>导出 JSON 摘要</Button></Space></div>
     <div className="schema-layout" style={{ gridTemplateColumns: collapsed ? 'minmax(0, 1fr)' : `${workspace.width ?? 280}px minmax(0, 1fr)` }}>
       {!collapsed && <aside className="schema-navigation" aria-label="库表导航">
         {sides.map(side => <section className="schema-picker" key={side}><Typography.Text strong>{sideLabel(side)} · {state.connections.find(c => c.id === state[side])?.name ?? '未选连接'}</Typography.Text>
@@ -115,6 +124,7 @@ export const SchemaWorkbench = forwardRef<SchemaHandle, { state: State; disabled
       </aside>}
       <div className="schema-results">
         <div className="pair-context">{sides.map(side => <div key={side}><span className="eyebrow">{sideLabel(side)}</span><strong title={identity(side)}>{identity(side)}</strong></div>)}</div>
+        <div style={{display:mode === "schema" ? undefined : "none"}}>
         {busy && <Alert type="info" showIcon title={`${busy}… 已用时 ${Math.max(0, (clock - started) / 1000).toFixed(1)} 秒`} description="后台执行，可取消；两端分别读取，不保证统一快照。" />}
         {notice && <Alert type={notice.type} showIcon title={notice.text} />}
         {!comparison ? <div className="schema-empty"><Empty description={busy ? '正在读取，尚无可用比对结果' : '尚未比对'} /><Typography.Paragraph type="secondary">选择两端数据库和表，再点击“开始比对”。无需先测试连接。</Typography.Paragraph></div> : <>
@@ -128,7 +138,9 @@ export const SchemaWorkbench = forwardRef<SchemaHandle, { state: State; disabled
             ]} expandable={{ expandedRowRender: row => <div className="property-detail"><div className="property-detail-header"><strong>完整属性</strong><span>{identity('left')}</span><span>{identity('right')}</span></div>{properties(row).map(property => <div className={property.changed ? 'changed-property' : ''} key={property.name}><strong>{property.name}</strong><pre tabIndex={0}>{property.left}</pre><pre tabIndex={0}>{property.right}</pre></div>)}{row.reason && <p>{row.reason}</p>}{(row.left?.ddl || row.right?.ddl) && <section className="definition-pair">{sides.map(side => <section className="definition" key={side}><div className="definition-heading"><strong>{sideLabel(side)} · {identity(side)} · {row.name}</strong><Button size="small" disabled={!row[side]?.ddl} onClick={() => void copy(side, row.category, row.name)}>复制对象完整定义</Button></div><pre tabIndex={0}>{row[side]?.ddl ?? '未读取到对象定义'}</pre></section>)}</section>}</div>, rowExpandable: row => !!row.left || !!row.right }} />
           </>}
         </>}
-        <SyncPanel comparison={comparison} selected={selectedKeys} disabled={disabled || !!busy} onRunning={onRunning} onComparison={value => { setComparison(value); setSelectedKeys([]); }} />
+        <SyncPanel comparison={comparison} selected={selectedKeys} disabled={disabled || !!busy} onRunning={running => { if (running && !syncWasRunning.current) invalidateData(); syncWasRunning.current = running; onRunning(running); }} onComparison={value => { setComparison(value); setSelectedKeys([]); }} />
+        </div>
+        <div style={{display:mode === "data" ? undefined : "none"}}>{dataOpened && <DataWorkbench key={dataEpoch} ref={dataWorkbench} workspace={workspace} disabled={disabled || !!busy} selected={selected} beforeRead={() => pendingWorkspace.current} onRunning={onDataRunning} />}</div>
       </div>
     </div>
   </section>;

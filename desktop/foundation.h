@@ -5,6 +5,9 @@
 #include <QObject>
 #include <QProcess>
 #include <functional>
+#include <memory>
+class QTemporaryDir;
+class QLockFile;
 
 QJsonObject probeDatabase(const QJsonObject &connection);
 QString validateConnection(const QJsonObject &connection);
@@ -15,6 +18,7 @@ class Foundation : public QObject {
     Q_OBJECT
 public:
     explicit Foundation(QString directory, QObject *parent = nullptr);
+    ~Foundation() override;
     bool busy() const { return !jobs.isEmpty(); }
     void stopJobs();
     QJsonObject snapshot() const;
@@ -25,6 +29,15 @@ signals:
     void response(const QString &json);
     void activityChanged();
 private:
+    std::unique_ptr<QTemporaryDir> dataTemp;
+    std::unique_ptr<QLockFile> dataLock;
+    QString dataPath;
+    QJsonObject dataState;
+    quint64 dataGeneration = 0;
+    void initializeData();
+    void invalidateData();
+    void dataTask(const QString &id, const QString &operation, const QJsonObject &args);
+    QJsonObject dataOperation(const QString &operation, const QJsonObject &args);
     QString directory, loadError;
     QJsonObject state;
     QHash<QString, QString> passwords;

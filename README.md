@@ -1,6 +1,6 @@
 # Speed Sync SQL
 
-Qt 6.10.2 + React 的 MySQL 桌面结构比对工具。D1 提供连接管理、系统凭据、主题/密度；D2 增加单表结构比对与差异摘要导出。D3 增加常规结构同步、SQL 预览、受控执行与记录；数据比对/同步留给后续阶段。
+Qt 6.10.2 + React 的 MySQL 桌面结构比对工具。D1 提供连接管理、系统凭据、主题/密度；D2 增加单表结构比对与差异摘要导出。D3 增加常规结构同步、SQL 预览、受控执行与记录；D4 增加只读数据比对，数据写入留给后续阶段。
 
 目标：Windows 10 1809+ x64、macOS 15+ arm64。本机开发环境为 macOS 27 arm64；Windows 10/macOS 15 的运行验证尚未完成。不能把本机构建成功当作双平台验收通过。
 
@@ -132,3 +132,26 @@ python3 tests/integration_sync.py \
   --output .local/evidence/d3-integration.json \
   --desktop-script tests/desktop_sync.mjs
 ```
+
+## 数据比对（D4）
+
+在同一库表工作台切换“数据比对”，点击“读取键与字段”，确认键、参与字段和共享 AND 范围后开始。进入页面不自动扫描业务行。默认建议两端兼容的主键或完整非空唯一键，支持复合键；无可靠键可选左右独立浏览，不按行号推断差异。
+
+同名兼容字段默认参与，可选子集；不兼容字段显示原因。类型、字符集、排序规则无法可靠兼容时保守受限。筛选参数由原生端校验和绑定；JSON 只提供 NULL 条件，二进制参数用完整 HEX 字节，时间参数明确格式。不提供任意 WHERE 或数据写入。
+
+扫描在子进程进行，每批 256 行，结果暂存在当前任务的本地 SQLite 中。前端仅请求结果页与原值片段；查看状态、完整键定位、左右字段详情与复制不会把整表传入页面。长值比较使用完整内容，精确数保留文本，NULL 与空串分开，二进制显示 HEX，时间保留微秒并将 TIMESTAMP 会话时区设为 UTC。完整结果只说明所选字段和范围。
+
+两端均成功读完才给出最终缺失计数与完整结论；停止、失败、缺表保持未完整。连接/库表/比对设置变化或结构执行开始使旧结果失效。两端读取不是同一全局瞬间；非 InnoDB 会明确提示无法保证一致快照。结果含实际时间、扫描行数与批次，不伪造百分比。
+
+临时结果在失效/关闭时回收，下次启动清理残留；不保存为业务执行记录或恢复为有效旧结果。深页 LIMIT/OFFSET 会增加数据库工作量，Unicode 临时存储也有磁盘成本；未承诺百万行性能。平台与发行限制沿用前文。
+
+D4 隔离集成检查（当前脚本的剪贴板核验使用 macOS 工具，完整保留和恢复原剪贴板）：
+
+```sh
+python3 tests/integration_data.py \
+  --mysql-home /Users/PopoY/Documents/DevTools/mysql/current \
+  --app build/speed-sync-sql.app/Contents/MacOS/speed-sync-sql \
+  --output .local/evidence/d4-integration.json
+```
+
+脚本仅启动和销毁自己的临时 MySQL，以 SELECT 账号执行数据比对，并核对 SQL 日志和样本校验和。验证记录见 [D4 验证记录](docs/development/d4-validation.md)。

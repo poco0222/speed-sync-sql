@@ -85,3 +85,11 @@ footer { min-height: 33px; border-top: 1px solid var(--line); display: flex; pad
 .sync-sql { margin: 0; padding: 12px; max-height: 360px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; background: rgba(128, 128, 128, .07); border-radius: 4px; }
 @media (max-width: 900px) { .sync-panel .definition-heading { flex-direction: column; align-items: flex-start; } }
 .sync-operations { max-height: 240px; overflow: auto; padding-left: 24px; margin: 8px 0; overflow-wrap: anywhere; }
+
+.data-workbench { display: grid; gap: 16px; min-width: 0; }
+.data-settings { display: grid; gap: 16px; grid-template-columns: minmax(200px, 1fr) minmax(260px, 2fr); }
+.data-settings label { display: grid; gap: 8px; }
+.data-filter { display: flex; }
+.data-filter .ant-select { min-width: 150px; }
+.data-value { max-height: 360px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; min-width: 180px; }
+@media (max-width: 800px) { .data-settings { grid-template-columns: 1fr; } }

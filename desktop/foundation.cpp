@@ -18,6 +18,8 @@
 #include <QTimer>
 #include <QUuid>
 #include <QRegularExpression>
+#include <QTemporaryDir>
+#include <QLockFile>
 
 namespace {
 QJsonObject failure(const QString &message, const QString &code = "application") {
@@ -103,6 +105,7 @@ QJsonObject probeDatabase(const QJsonObject &c) {
 }
 Foundation::Foundation(QString path, QObject *parent) : QObject(parent), directory(std::move(path)) {
     state = {{"connections", QJsonArray{}}, {"left", ""}, {"right", ""}, {"settings", QJsonObject{{"theme", "system"}, {"density", "standard"}, {"timeout", 10}}}};
+    initializeData();
     recoverSyncRecords();
     QFile f(directory + "/connections.json");
     if (!f.exists()) return;
@@ -149,6 +152,7 @@ bool Foundation::persist(const QJsonObject &next, QString &error) {
 QJsonObject Foundation::execute(const QString &operation, const QJsonObject &args) {
     if (operation == "snapshot") return success({{"state", snapshot()}});
     if (!loadError.isEmpty()) return failure(loadError, "storage");
+    if (operation.startsWith("data-")) return dataOperation(operation, args);
     if (operation.contains("sync") || operation == "invalidate-plan") return syncOperation(operation, args);
     if (syncExecuting && QStringList{"save", "delete", "select", "workspace", "settings", "cancel-schema"}.contains(operation)) return failure("结构执行中，请等待结束后修改上下文", "busy");
     auto next = state;
@@ -285,6 +289,7 @@ QJsonObject Foundation::execute(const QString &operation, const QJsonObject &arg
         if (!QStringList{"system", "light", "dark"}.contains(args["theme"].toString()) || !QStringList{"standard", "compact"}.contains(args["density"].toString()) || !integer(args["timeout"], 1, 60)) return failure("设置值无效", "validation");
         next["settings"] = QJsonObject{{"theme", args["theme"]}, {"density", args["density"]}, {"timeout", args["timeout"]}};
         if (!persist(next, error)) return failure(error, "storage");
+        invalidateData();
     } else if (operation == "export") {
         auto filename = QFileDialog::getSaveFileName(nullptr, "保存连接测试摘要", QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/connection-diagnostics.json", "JSON (*.json)");
         if (filename.isEmpty()) return success({{"cancelled", true}});
@@ -311,7 +316,8 @@ void Foundation::request(const QString &json) {
     auto o = document.object(); auto id = o["requestId"].toString();
     if (id.isEmpty() || id.size() > 100) return;
     if (error.error != QJsonParseError::NoError || !o["args"].isObject()) { reply(id, failure("请求格式无效", "validation")); return; }
-    if (o["operation"] == "plan-sync") planSync(id, o["args"].toObject());
+    if (o["operation"] == "data-prepare" || o["operation"] == "data-start") dataTask(id, o["operation"].toString(), o["args"].toObject());
+    else if (o["operation"] == "plan-sync") planSync(id, o["args"].toObject());
     else if (o["operation"] == "test") test(id, o["args"].toObject());
     else if (o["operation"] == "schema" || o["operation"] == "compare") schemaTask(id, o["operation"].toString(), o["args"].toObject());
     else reply(id, execute(o["operation"].toString(), o["args"].toObject()));
@@ -374,6 +380,7 @@ QString Foundation::workspaceKey() const {
     return state["left"].toString() + ":" + state["right"].toString();
 }
 void Foundation::invalidateSchema() {
+    invalidateData();
     ++schemaGeneration; ++planGeneration; comparison = {}; syncPlan = {};
     for (auto it = jobs.cbegin(); it != jobs.cend(); ++it) if (it.key().startsWith("schema:")) {
         it.value()->setProperty("cancelled", true); it.value()->kill();
