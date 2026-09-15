@@ -1,6 +1,6 @@
 # Speed Sync SQL
 
-本文保留产品规划阶段的需求与授权边界。D1 的已确认实施范围见 [desktop-foundation 规格](docs/comet/changes/desktop-foundation/specs/desktop-foundation/spec.md)，当前实现与验证状态见 [README](README.md)。
+本文保留产品规划阶段的需求与授权边界。D1 的已确认实施范围见 [desktop-foundation 规格](docs/comet/specs/desktop-foundation/spec.md)，当前实现与验证状态见 [README](README.md)。
 
 <!-- impeccable:product-schema 1 -->
 

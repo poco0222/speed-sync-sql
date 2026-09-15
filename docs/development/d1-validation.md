@@ -2,7 +2,7 @@
 
 日期：2026-09-15。此文件为开发期证据摘要，不替代 Comet Verifier 的验收结论。
 
-当前正式结论：独立验收 A1-A6 通过，A7 因 Windows 10/macOS 15 实测环境缺失受阻。无待修复代码问题；Comet 保留在 Verify 等待外部证据，未归档。正式逐项结论见 [验收报告](../comet/changes/desktop-foundation/verification.md)。
+当前正式结论：D1 已于 2026-09-15 归档，本次验收 A1-A6 通过。用户接受当前交付并要求归档后，原 A7 转为[后续平台验证](platform-validation-pending.md)，Windows 10/macOS 15 实际运行仍为 NOT RUN。归档不代表目标系统已实测通过。正式逐项结论见 [验收报告](../comet/archive/2026-09-15-desktop-foundation/verification.md)。
 
 2026-09-15，用户明确回复“接受”，接受当前本机交付及已说明的验证限制。A7 仍保留待实测状态；接受交付不构成目标系统已验证的证据。
 

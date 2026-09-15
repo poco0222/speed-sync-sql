@@ -88,4 +88,4 @@ SPEED_SYNC_SMOKE_REPORT="$PWD/.local/evidence/desktop-smoke.json" \
   build/speed-sync-sql.app/Contents/MacOS/speed-sync-sql
 ```
 
-生成本地 JSON 和截图后退出。正常启动不设置这些变量。实际检查与限制见 [D1 检查记录](docs/development/d1-validation.md)，完整规格见 [desktop-foundation](docs/comet/changes/desktop-foundation/specs/desktop-foundation/spec.md)。
+生成本地 JSON 和截图后退出。正常启动不设置这些变量。实际检查与限制见 [D1 检查记录](docs/development/d1-validation.md)，完整规格见 [desktop-foundation](docs/comet/specs/desktop-foundation/spec.md)。
