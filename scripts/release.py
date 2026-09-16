@@ -73,7 +73,7 @@ def diagnose_tests(build):
         print(f'[DIAGNOSTIC] Running {executable.name} directly', flush=True)
         try:
             result = subprocess.run(
-                [str(executable)], cwd=build, capture_output=True, text=True,
+                [str(executable), '-vs'], cwd=build, capture_output=True, text=True,
                 timeout=120, env=test_env, check=False,
             )
             print(f'[DIAGNOSTIC] {executable.name} exit={result.returncode}', flush=True)
