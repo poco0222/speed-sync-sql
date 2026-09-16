@@ -71,9 +71,10 @@ def diagnose_tests(build):
     test_env.update({'QT_QPA_PLATFORM': 'offscreen', 'SPEED_SYNC_ALLOW_MULTI_INSTANCE': '1'})
     for executable in sorted(build.glob(f'*-tests{suffix}')):
         print(f'[DIAGNOSTIC] Running {executable.name} directly', flush=True)
+        report = build / f'{executable.stem}-diagnostic.txt'
         try:
             result = subprocess.run(
-                [str(executable), '-vs'], cwd=build, capture_output=True, text=True,
+                [str(executable), '-vs', '-o', f'{report},txt'], cwd=build, capture_output=True, text=True,
                 timeout=120, env=test_env, check=False,
             )
             print(f'[DIAGNOSTIC] {executable.name} exit={result.returncode}', flush=True)
@@ -81,6 +82,8 @@ def diagnose_tests(build):
                 print(f'[DIAGNOSTIC] stdout:\n{result.stdout}', flush=True)
             if result.stderr:
                 print(f'[DIAGNOSTIC] stderr:\n{result.stderr}', flush=True)
+            if report.exists():
+                print(f'[DIAGNOSTIC] report:\n{report.read_text(errors="replace")}', flush=True)
         except Exception as error:
             print(f'[DIAGNOSTIC] {executable.name} launcher error: {error}', flush=True)
 
