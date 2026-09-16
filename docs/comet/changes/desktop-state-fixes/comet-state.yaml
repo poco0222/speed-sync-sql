@@ -1,0 +1,260 @@
+schema: comet.native.v4
+name: desktop-state-fixes
+language: zh-CN
+phase: archive
+status: active
+state_version: 25
+brief: brief.md
+shape_confirmation_hash: cadc09249c4c20f6de14b2dc6bc528f374aaaab17e5e0261f08641546c277c19
+spec_changes:
+  - capability: desktop-state-safety
+    operation: create
+    source: specs/desktop-state-safety/spec.md
+workspace:
+  isolation: current
+  change_branch: main
+  target_branch: main
+  finish: null
+loop:
+  stage: archive-ready
+  goal_cycle: 2
+  iteration: 1
+  attempt: 1
+  retry_epoch: 0
+  failed_iteration_count: 0
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: archive
+acceptance:
+  - id: A1
+    source: brief.md
+    text: A1：真实 Qt
+      数据写入期间，连接选择、编辑、库表输入、设置与历史恢复入口禁用，页脚标数据写入；停止按钮仍可用，结束后恢复控件；原生上下文锁回归通过。
+    result: passed
+    reason:
+      text: 数据写入状态独立上报并锁定所有上下文入口，页脚显示数据写入。
+      truncated: false
+  - id: A2
+    source: brief.md
+    text: A2：只读扫描期间仍可切换连接或取消，旧结果不会回填；结构同步与数据写入原有互斥保持有效。
+    result: passed
+    reason:
+      text: 只读扫描与写入状态分离，取消和迟到结果保护保持。
+      truncated: false
+  - id: A3
+    source: brief.md
+    text: A3：现有前端构建/测试、原生构建/CTest、D4 与 D5/D6 相关隔离 MySQL/真实 Qt 回归通过；证据与未运行的平台边界如实记录。
+      A3/A4 原验收项改为后续验证限制，保留在本 change 的 Scope/Non-goals 与验证记录中，不作为本次归档门槛。
+    result: passed
+    reason:
+      text: 前端 18/18、构建和 git diff check 通过；原生 build/CTest 采用同候选已记录证据，环境实测限制已明确记录。
+      truncated: false
+builder_handoff:
+  candidate_id: ec54c58a-e3cf-4ab8-8bd3-6ae5952920f9
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:cc0d5a2d-14f8-4faf-b2fd-52bcb6f32856
+  iteration: 1
+  summary:
+    text: 已完成 R1/R2/R3：数据写入独立上报并锁定所有上下文入口；设置保存保留数据任务；配置目录默认单实例锁。原 A3/A4
+      环境实测已按用户确认移为后续限制。
+    truncated: false
+  addressed_acceptance_ids:
+    - A1
+    - A2
+    - A3
+  checks:
+    - name:
+        text: npm --prefix frontend test
+        truncated: false
+      result: passed
+      note:
+        text: 18/18
+        truncated: false
+    - name:
+        text: npm --prefix frontend run build
+        truncated: false
+      result: passed
+      note:
+        text: chunk warning
+        truncated: false
+    - name:
+        text: cmake build
+        truncated: false
+      result: passed
+      note:
+        text: Qt 6.10.2
+        truncated: false
+    - name:
+        text: ctest --test-dir build --output-on-failure
+        truncated: false
+      result: passed
+      note:
+        text: 7/7
+        truncated: false
+    - name:
+        text: git diff --check
+        truncated: false
+      result: passed
+      note:
+        text: clean
+        truncated: false
+  checks_truncated: false
+  known_limits:
+    - text: Windows/macOS 15、远程 CI、干净机器、真实 Qt 设置后继续操作、双实例完整链路均未运行，按当前范围保留为后续验证限制。
+      truncated: false
+  known_limits_truncated: false
+  review:
+    status: passed
+    summary:
+      text: 复核状态传递、设置保存和单实例锁；构建与测试通过。
+      truncated: false
+    reviewer_execution_ref: reviewer-execution-final-desktop-state-fixes-20260916
+  submitted_at: 2026-09-16T00:12:43.276Z
+blockers: []
+verification:
+  candidate_id: ec54c58a-e3cf-4ab8-8bd3-6ae5952920f9
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:0f37a73c-8ac1-458a-b6e8-2c6e70b78e29
+  iteration: 1
+  attempt: 1
+  assurance: skill-coordinated
+  verdict: pass
+  checks: []
+  summary:
+    text: 按用户确认的新范围，A1-A3 通过；平台和环境验证保留为后续限制。
+    truncated: false
+  risks:
+    - text: Windows/macOS15、远程 CI、干净机器、真实 Qt 设置后操作、双实例完整链路仍未验证。
+      truncated: false
+  risks_truncated: false
+  completed_at: 2026-09-16T00:14:14.857Z
+history:
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 1
+    outcome: blocked
+    unresolved_ids:
+      - A3
+      - A4
+    summary:
+      text: R1/R2/R3 实现已完成，A1/A2/A5 通过；A3/A4 因验收证据不足暂时 blocked。
+      truncated: false
+    completed_at: 2026-09-16T00:00:03.050Z
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 1
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: 接受 A3/A4 当前验证边界：实现已完成，A1/A2/A5 通过；A3 缺少真实 Qt 设置后继续详情/计划的独立证据，A4
+        缺少完整双实例/释放锁/崩溃恢复实测。将这些保留为未验证限制，不声明通过。
+      truncated: false
+    completed_at: 2026-09-16T00:01:33.653Z
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 2
+    outcome: blocked
+    unresolved_ids:
+      - A3
+      - A4
+    summary:
+      text: A3/A4 按用户已选择的边界保留 blocked；A1/A2/A5 已通过。
+      truncated: false
+    completed_at: 2026-09-16T00:02:47.297Z
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 2
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: 再次确认接受 A3/A4 未验证限制：A1/A2/A5 通过；A3 缺真实 Qt 设置后继续操作证据，A4 缺双实例/释放/崩溃恢复完整实测。保留
+        blocked 与风险说明，不声明全部验收通过。
+      truncated: false
+    completed_at: 2026-09-16T00:03:24.794Z
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 3
+    outcome: blocked
+    unresolved_ids:
+      - A3
+      - A4
+    summary:
+      text: 用户已明确接受 A3/A4 未验证边界；A1/A2/A5 通过。
+      truncated: false
+    completed_at: 2026-09-16T00:04:21.103Z
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 3
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: 接受 A3/A4 为未验证限制并结束本轮：A1/A2/A5 通过；A3 无真实 Qt 设置后继续操作证据；A4
+        无完整双实例隔离、释放重开、崩溃恢复实测。保留 blocked/风险，不声明全部验收通过。
+      truncated: false
+    completed_at: 2026-09-16T00:04:58.984Z
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 4
+    outcome: blocked
+    unresolved_ids:
+      - A3
+      - A4
+    summary:
+      text: 用户已明确接受 A3/A4 未验证边界；A1/A2/A5 通过。
+      truncated: false
+    completed_at: 2026-09-16T00:06:03.483Z
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 4
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: 用户明确要求归档 change；A3/A4 暂无环境实测，作为已知未验证限制保留并归档，不改标为通过。A1/A2/A5 通过。
+      truncated: false
+    completed_at: 2026-09-16T00:07:54.010Z
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 5
+    outcome: blocked
+    unresolved_ids:
+      - A3
+      - A4
+    summary:
+      text: 用户明确要求归档并接受 A3/A4 未验证边界。
+      truncated: false
+    completed_at: 2026-09-16T00:08:15.278Z
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 5
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: 将 A3/A4 从当前 change 的强制验收项调整为后续环境验证限制：不要求本 change 证明真实 Qt 设置后继续操作，也不要求本
+        change 证明双实例/释放/崩溃恢复全链路；保留实现、代码检查和明确 NOT RUN 文档。A1/A2/A5 继续作为本 change
+        验收项。调整后按 Runtime 重新确认并归档。
+      truncated: false
+    completed_at: 2026-09-16T00:11:43.395Z
+  - goal_cycle: 2
+    iteration: 1
+    attempt: 1
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: 按用户确认的新范围，A1-A3 通过；平台和环境验证保留为后续限制。
+      truncated: false
+    completed_at: 2026-09-16T00:14:14.857Z
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pass
+verification_report: verification.md
+archived: false
+created_at: 2026-09-15T23:48:54.534Z

@@ -13,7 +13,11 @@ namespace {
 QJsonObject fail(const QString &error,const QString &code="data") { return {{"ok",false},{"error",error},{"code",code}}; }
 }
 void Foundation::initializeData() {
-    if(!QDir().mkpath(directory)) return;
+    if(!QDir().mkpath(directory)) { loadError="无法创建应用数据目录"; return; }
+    if (!qEnvironmentVariableIsSet("SPEED_SYNC_ALLOW_MULTI_INSTANCE")) {
+        instanceLock=std::make_unique<QLockFile>(directory+"/instance.lock"); instanceLock->setStaleLockTime(0);
+        if(!instanceLock->tryLock(0)) { loadError="应用数据目录已被另一个实例使用，请关闭其他实例后重试"; instanceLock.reset(); return; }
+    }
     QDir parent(directory);
     for(const auto &name:parent.entryList({"data-tmp-*"},QDir::Dirs|QDir::NoDotAndDotDot)) {
         const auto path=parent.filePath(name); QLockFile old(path+"/owner.lock"); old.setStaleLockTime(0);

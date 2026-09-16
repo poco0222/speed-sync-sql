@@ -7,7 +7,7 @@ import {dataConclusion,dataLabels,displayValue,exactKey,copyOriginalText,operato
 
 export type DataHandle={invalidate:()=>void};
 const call=async(operation:string,args:object={}):Promise<DataResult>=>{const result=await request(operation,args) as DataResult;if(!result.ok||result.stale)throw new Error(result.error??'数据结果已失效，请重新读取');return result;};
-export const DataWorkbench=forwardRef<DataHandle,{workspace:Workspace;disabled:boolean;selected:boolean;beforeRead:()=>Promise<void>;onRunning:(running:boolean)=>void}>(function DataWorkbench({workspace,disabled,selected,beforeRead,onRunning},ref){
+export const DataWorkbench=forwardRef<DataHandle,{workspace:Workspace;disabled:boolean;selected:boolean;beforeRead:()=>Promise<void>;onRunning:(running:boolean)=>void;onMergeRunning?:(running:boolean)=>void}>(function DataWorkbench({workspace,disabled,selected,beforeRead,onRunning,onMergeRunning},ref){
  const [mergeRunning,setMergeRunning]=useState(false);
  const [preparation,setPreparation]=useState<Preparation>();
  const [key,setKey]=useState<string[]>([]),[fields,setFields]=useState<string[]>([]),[filters,setFilters]=useState<DataFilter[]>([]);
@@ -18,8 +18,8 @@ export const DataWorkbench=forwardRef<DataHandle,{workspace:Workspace;disabled:b
  const [busy,setBusy]=useState(''),[error,setError]=useState(''),[pageError,setPageError]=useState(''),[valueBusy,setValueBusy]=useState('');
  const generation=useRef(0),activeId=useRef(''),detailGeneration=useRef(0),pageGeneration=useRef(0);
  const [message,messageHolder]=messageService.useMessage();
- const runningCallback=useRef(onRunning);runningCallback.current=onRunning;
- useEffect(()=>{runningCallback.current(mergeRunning||!!busy||!!taskId&&(!task||task.state==='running'));},[busy,taskId,task,mergeRunning]);
+ const runningCallback=useRef(onRunning);runningCallback.current=onRunning;const mergeCallback=useRef(onMergeRunning);mergeCallback.current=onMergeRunning;
+ useEffect(()=>{runningCallback.current(!!busy||!!taskId&&(!task||task.state==='running'));mergeCallback.current?.(mergeRunning);},[busy,taskId,task,mergeRunning]);
  useEffect(()=>()=>runningCallback.current(false),[]);
  const invalidate=()=>{generation.current++;detailGeneration.current++;pageGeneration.current++;const id=activeId.current;activeId.current='';setTaskId('');setTask(undefined);setRows([]);setTotal(0);setDetail(undefined);setDetailRow(undefined);setLocated(undefined);setPage(1);setBusy('');setError('');setPageError('');if(id)void call('data-invalidate',{taskId:id}).catch(e=>setError(e.message));};
  useImperativeHandle(ref,()=>({invalidate}));

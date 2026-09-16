@@ -13,7 +13,7 @@ const sideLabel = (side: Side) => side === 'left' ? '左侧' : '右侧';
 const format = (value: unknown): string => value === undefined ? '—' : typeof value === 'string' ? value : JSON.stringify(value, null, 2);
 const statusColor = (status: string) => ({ same: 'success', different: 'warning', 'left-only': 'blue', 'right-only': 'purple', failed: 'error', unsupported: 'orange' }[status]);
 
-export const SchemaWorkbench = forwardRef<SchemaHandle, { state: State; disabled: boolean; onRunning: (running: boolean) => void; onDataRunning: (running: boolean) => void }>(function SchemaWorkbench({ state, disabled, onRunning, onDataRunning }, ref) {
+export const SchemaWorkbench = forwardRef<SchemaHandle, { state: State; disabled: boolean; onRunning: (running: boolean) => void; onDataRunning: (running: boolean) => void; onDataWriteRunning: (running: boolean) => void }>(function SchemaWorkbench({ state, disabled, onRunning, onDataRunning, onDataWriteRunning }, ref) {
   const [workspace, setWorkspace] = useState<Workspace>(() => ({ left: state.workspace?.left ?? { database: state.connections.find(c => c.id === state.left)?.database ?? '', table: '' }, right: state.workspace?.right ?? { database: state.connections.find(c => c.id === state.right)?.database ?? '', table: '' }, width: state.workspace?.width ?? 280 }));
   const [lists, setLists] = useState<Record<string, { name: string; type?: string }[]>>({});
   const [comparison, setComparison] = useState<Comparison>();
@@ -140,7 +140,7 @@ export const SchemaWorkbench = forwardRef<SchemaHandle, { state: State; disabled
         </>}
         <SyncPanel comparison={comparison} selected={selectedKeys} disabled={disabled || !!busy} onRunning={running => { if (running && !syncWasRunning.current) invalidateData(); syncWasRunning.current = running; onRunning(running); }} onComparison={value => { setComparison(value); setSelectedKeys([]); }} />
         </div>
-        <div style={{display:mode === "data" ? undefined : "none"}}>{dataOpened && <DataWorkbench key={dataEpoch} ref={dataWorkbench} workspace={workspace} disabled={disabled || !!busy} selected={selected} beforeRead={() => pendingWorkspace.current} onRunning={onDataRunning} />}</div>
+        <div style={{display:mode === "data" ? undefined : "none"}}>{dataOpened && <DataWorkbench key={dataEpoch} ref={dataWorkbench} workspace={workspace} disabled={disabled || !!busy} selected={selected} beforeRead={() => pendingWorkspace.current} onRunning={onDataRunning} onMergeRunning={onDataWriteRunning} />}</div>
       </div>
     </div>
   </section>;

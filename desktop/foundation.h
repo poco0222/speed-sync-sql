@@ -31,6 +31,7 @@ signals:
 private:
     std::unique_ptr<QTemporaryDir> dataTemp;
     std::unique_ptr<QLockFile> dataLock;
+    std::unique_ptr<QLockFile> instanceLock;
     QString dataPath;
     QJsonObject dataState;
     quint64 dataGeneration = 0;

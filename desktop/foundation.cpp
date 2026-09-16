@@ -290,7 +290,6 @@ QJsonObject Foundation::execute(const QString &operation, const QJsonObject &arg
         if (!QStringList{"system", "light", "dark"}.contains(args["theme"].toString()) || !QStringList{"standard", "compact"}.contains(args["density"].toString()) || !integer(args["timeout"], 1, 60)) return failure("设置值无效", "validation");
         next["settings"] = QJsonObject{{"theme", args["theme"]}, {"density", args["density"]}, {"timeout", args["timeout"]}};
         if (!persist(next, error)) return failure(error, "storage");
-        invalidateData();
     } else if (operation == "export") {
         auto filename = QFileDialog::getSaveFileName(nullptr, "保存连接测试摘要", QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/connection-diagnostics.json", "JSON (*.json)");
         if (filename.isEmpty()) return success({{"cancelled", true}});

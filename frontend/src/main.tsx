@@ -21,6 +21,7 @@ function Application() {
   const [fatal, setFatal] = useState('');
   const [syncRunning, setSyncRunning] = useState(false);
   const [dataRunning, setDataRunning] = useState(false);
+  const [dataWriteRunning, setDataWriteRunning] = useState(false);
   const [restoreKey, setRestoreKey] = useState(0);
   const [page, setPage] = useState('workbench');
   const [editing, setEditing] = useState<Connection | null>(null);
@@ -46,6 +47,7 @@ function Application() {
   }, [running]);
   const elapsed = (lane: string) => Math.max(0, (clock - (startedAt[lane] ?? clock)) / 1000).toFixed(1);
   const unavailable = syncRunning || booting || !!fatal || !!state.loadError;
+  const contextLocked = unavailable || dataWriteRunning;
   useEffect(() => {
     const media = matchMedia('(prefers-color-scheme: dark)');
     const change = () => setSystemDark(media.matches);
@@ -108,32 +110,32 @@ function Application() {
     const connection = state.connections.find(item => item.id === state[side]);
     return <section className="endpoint" aria-label={side === 'left' ? '左侧连接' : '右侧连接'}>
       <div className="eyebrow">{side === 'left' ? '左侧' : '右侧'}连接</div>
-      <div className="endpoint-controls"><Select aria-label={side === 'left' ? '选择左侧连接' : '选择右侧连接'} placeholder="选择一个连接" value={state[side] || undefined} allowClear showSearch optionFilterProp="label" disabled={unavailable || busy[side]} options={state.connections.map(c => ({ value: c.id, label: c.name }))} onChange={id => void select(side, id ?? '')} /><Button disabled={!connection || unavailable} loading={busy[side]} onClick={() => void test(side, connection)}>测试连接</Button><Button disabled={unavailable} onClick={() => openEditor(connection)}>{connection ? '编辑' : '新建'}</Button></div>
+      <div className="endpoint-controls"><Select aria-label={side === 'left' ? '选择左侧连接' : '选择右侧连接'} placeholder="选择一个连接" value={state[side] || undefined} allowClear showSearch optionFilterProp="label" disabled={contextLocked || busy[side]} options={state.connections.map(c => ({ value: c.id, label: c.name }))} onChange={id => void select(side, id ?? '')} /><Button disabled={!connection || contextLocked} loading={busy[side]} onClick={() => void test(side, connection)}>测试连接</Button><Button disabled={contextLocked} onClick={() => openEditor(connection)}>{connection ? '编辑' : '新建'}</Button></div>
       <div className="endpoint-detail">{busy[side] ? <Text>正在测试连接… 已用时 {elapsed(side)} 秒，窗口仍可操作</Text> : connection ? <><span className="mono">{connection.host}:{connection.port}{connection.database ? ` / ${connection.database}` : ''}</span><ResultText result={connection.lastTest} /></> : <Text type="secondary">选择或新建连接后测试可达性</Text>}</div>
     </section>;
   };
   return <ConfigProvider locale={zhCN} theme={{ algorithm: [dark ? theme.darkAlgorithm : theme.defaultAlgorithm, ...(state.settings.density === 'compact' ? [theme.compactAlgorithm] : [])], token: { colorPrimary: '#2764d7', borderRadius: 6, fontSize: 14, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' } }}>
     {messageHolder}{modalHolder}<Layout className="app-shell">
-      <header className="topbar"><div className="brand"><span className="brand-mark">S<span>↔</span></span><strong>Speed Sync <span>SQL</span></strong></div><Menu mode="horizontal" selectedKeys={[page]} items={[{ key: 'workbench', label: '比对工作台' }, { key: 'connections', label: '连接管理' }, { key: 'records', label: '执行记录' }]} onClick={({ key }) => setPage(key)} /><Button disabled={unavailable} onClick={() => { setSettingsDraft(state.settings); setSettingsOpen(true); }}>设置</Button></header>
+      <header className="topbar"><div className="brand"><span className="brand-mark">S<span>↔</span></span><strong>Speed Sync <span>SQL</span></strong></div><Menu mode="horizontal" selectedKeys={[page]} items={[{ key: 'workbench', label: '比对工作台' }, { key: 'connections', label: '连接管理' }, { key: 'records', label: '执行记录' }]} onClick={({ key }) => setPage(key)} /><Button disabled={contextLocked} onClick={() => { setSettingsDraft(state.settings); setSettingsOpen(true); }}>设置</Button></header>
       <main>
         {(fatal || state.loadError) && <Alert className="banner" type="error" showIcon title={fatal || state.loadError} />}
         {!fatal && !booting && !state.driverAvailable && <Alert className="banner" type="warning" showIcon title="QMYSQL 驱动未就绪" description="可先保存连接配置。连接测试需要安装匹配的 MySQL 驱动及客户端库。" />}
         {<div style={{ display: page === 'workbench' ? 'contents' : 'none' }}>
           <div className="connection-bar">{endpoint('left')}<div className="connection-divider" />{endpoint('right')}</div>
-          {!booting && <SchemaWorkbench ref={schemaWorkbench} key={JSON.stringify([restoreKey, state.left, state.right, ...state.connections.filter(c => c.id === state.left || c.id === state.right).map(({ lastTest, ...connection }) => connection)])} state={state} disabled={unavailable} onRunning={setSyncRunning} onDataRunning={setDataRunning} />}
+          {!booting && <SchemaWorkbench ref={schemaWorkbench} key={JSON.stringify([restoreKey, state.left, state.right, ...state.connections.filter(c => c.id === state.left || c.id === state.right).map(({ lastTest, ...connection }) => connection)])} state={state} disabled={unavailable} onRunning={setSyncRunning} onDataRunning={setDataRunning} onDataWriteRunning={setDataWriteRunning} />}
         </div>}
-        {page === 'records' && <SyncRecords disabled={unavailable} onRestore={next => { schemaWorkbench.current?.invalidate(); setState(next); setRestoreKey(value => value + 1); setPage('workbench'); }} />}
-        {page === 'connections' && <section className="connections-page"><div className="page-heading"><div><div className="eyebrow">连接管理</div><Title level={3}>常用数据库</Title><Text type="secondary">保存配置与测试连接相互独立。</Text></div><Space wrap><Button disabled={unavailable} onClick={() => { void action('export', {}).then(result => { if (!result.cancelled) void message.success('诊断摘要已保存'); }).catch(report); }}>导出诊断</Button><Button type="primary" disabled={unavailable} onClick={() => openEditor()}>新建连接</Button></Space></div>
+        {page === 'records' && <SyncRecords disabled={contextLocked} onRestore={next => { schemaWorkbench.current?.invalidate(); setState(next); setRestoreKey(value => value + 1); setPage('workbench'); }} />}
+        {page === 'connections' && <section className="connections-page"><div className="page-heading"><div><div className="eyebrow">连接管理</div><Title level={3}>常用数据库</Title><Text type="secondary">保存配置与测试连接相互独立。</Text></div><Space wrap><Button disabled={contextLocked} onClick={() => { void action('export', {}).then(result => { if (!result.cancelled) void message.success('诊断摘要已保存'); }).catch(report); }}>导出诊断</Button><Button type="primary" disabled={contextLocked} onClick={() => openEditor()}>新建连接</Button></Space></div>
           <Table<Connection> rowKey="id" dataSource={state.connections} pagination={false} scroll={{ x: 920 }} locale={{ emptyText: <Empty description="还没有保存的连接"><Button onClick={() => openEditor()} disabled={unavailable}>添加第一个连接</Button></Empty> }} columns={[
-            { title: '连接名称', dataIndex: 'name', width: 190, render: (name, c) => <Button type="link" className="name-button" disabled={unavailable} onClick={() => openEditor(c)}>{name}</Button> },
+            { title: '连接名称', dataIndex: 'name', width: 190, render: (name, c) => <Button type="link" className="name-button" disabled={contextLocked} onClick={() => openEditor(c)}>{name}</Button> },
             { title: '服务器', key: 'server', width: 230, render: (_, c) => <div><span className="mono">{c.host}:{c.port}</span><div className="subtle">{c.database || '未指定默认数据库'}</div></div> },
             { title: '上次测试', key: 'test', width: 280, render: (_, c) => <ResultText result={c.lastTest} /> },
-            { title: '操作', key: 'actions', width: 280, render: (_, c) => <Space size={4} wrap><Button size="small" disabled={unavailable || busy.left} onClick={() => void select('left', c.id!)}>用作左侧</Button><Button size="small" disabled={unavailable || busy.right} onClick={() => void select('right', c.id!)}>用作右侧</Button><Button size="small" disabled={unavailable} onClick={() => openEditor(c, true)}>复制</Button><Button size="small" disabled={unavailable} danger onClick={() => remove(c)}>删除</Button></Space> }
+            { title: '操作', key: 'actions', width: 280, render: (_, c) => <Space size={4} wrap><Button size="small" disabled={contextLocked || busy.left} onClick={() => void select('left', c.id!)}>用作左侧</Button><Button size="small" disabled={contextLocked || busy.right} onClick={() => void select('right', c.id!)}>用作右侧</Button><Button size="small" disabled={contextLocked} onClick={() => openEditor(c, true)}>复制</Button><Button size="small" disabled={contextLocked} danger onClick={() => remove(c)}>删除</Button></Space> }
           ]} />
         </section>}
       </main>
-      <footer><span>{syncRunning ? '结构同步执行中' : dataRunning ? '数据读取 / 比对进行中' : Object.values(busy).some(Boolean) ? '连接测试进行中' : '当前无运行任务'}</span><span>本地桌面应用</span></footer>
-      <Drawer title={editing?.id ? '编辑连接' : '新建连接'} open={drawerOpen} onClose={closeEditor} width={480} maskClosable={!saving} closable={!saving} extra={<Button disabled={saving} onClick={closeEditor}>取消</Button>} footer={<div className="drawer-footer"><Button loading={busy.editor} disabled={saving} onClick={() => void test('editor')}>测试连接</Button><Button type="primary" loading={saving} onClick={() => void save()}>保存连接</Button></div>}>
+      <footer><span>{syncRunning ? '结构同步执行中' : dataWriteRunning ? '数据写入执行中' : dataRunning ? '数据读取 / 比对进行中' : Object.values(busy).some(Boolean) ? '连接测试进行中' : '当前无运行任务'}</span><span>本地桌面应用</span></footer>
+      <Drawer title={editing?.id ? '编辑连接' : '新建连接'} open={drawerOpen} onClose={closeEditor} width={480} maskClosable={!saving&&!contextLocked} closable={!saving&&!contextLocked} extra={<Button disabled={saving||contextLocked} onClick={closeEditor}>取消</Button>} footer={<div className="drawer-footer"><Button loading={busy.editor} disabled={saving||contextLocked} onClick={() => void test('editor')}>测试连接</Button><Button type="primary" loading={saving} disabled={saving||contextLocked} onClick={() => void save()}>保存连接</Button></div>}>
         <Form form={form} layout="vertical" requiredMark="optional" onValuesChange={() => { freshness.current.invalidate('editor'); setEditorResult(undefined); }}>
           <Form.Item name="name" label="连接名称" rules={[{ required: true, whitespace: true, message: '输入便于辨认的连接名称' }, { max: 255 }]}><Input placeholder="例如：开发环境" maxLength={255} /></Form.Item>
           <div className="form-row"><Form.Item name="host" label="主机" rules={[{ required: true, whitespace: true, message: '请输入主机地址' }]}><Input placeholder="127.0.0.1" maxLength={255} /></Form.Item><Form.Item name="port" label="端口" rules={[{ required: true, type: 'integer', min: 1, max: 65535, message: '端口范围 1–65535' }]}><InputNumber min={1} max={65535} precision={0} /></Form.Item></div>
