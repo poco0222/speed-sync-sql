@@ -299,7 +299,14 @@ def main():
     run(cmake, '-S', ROOT, '-B', build, '-G', 'Ninja', f'-DCMAKE_PREFIX_PATH={qt}',
         '-DCMAKE_BUILD_TYPE=Release', *arch)
     run(cmake, '--build', build, '--parallel', '3')
-    run('ctest', '--test-dir', build, '--output-on-failure', '--timeout', '90')
+    try:
+        run('ctest', '--test-dir', build, '--output-on-failure', '--timeout', '90')
+    except subprocess.CalledProcessError:
+        # CTest can suppress a native test's output when the process exits early;
+        # rerun verbosely so CI contains the actual assertion or loader error.
+        print('[DIAGNOSTIC] Re-running failed CTest suite verbosely', flush=True)
+        run('ctest', '--test-dir', build, '--output-on-failure', '--verbose', '--timeout', '90')
+        raise
     version = re.search(r'project\(SpeedSyncSQL VERSION ([0-9.]+)', (ROOT / 'CMakeLists.txt').read_text())[1]
     name = f'speed-sync-sql-{version}-' + ('macos-arm64' if MAC else 'windows-x64')
     stage = WORK / 'staging' / name
