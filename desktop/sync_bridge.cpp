@@ -97,6 +97,7 @@ void Foundation::recoverSyncRecords() {
         QFile file(folder.filePath(name));
         if (!file.open(QIODevice::ReadOnly)) continue;
         auto record = QJsonDocument::fromJson(file.readAll()).object();
+        file.close();
         const bool dataRecord=record["mode"]=="data-fill" || record["mode"]=="data-merge" || record["mode"]=="data-align";
         if (QUuid(record["id"].toString()).isNull() || !(dataRecord?record["batches"].isArray():record["steps"].isArray())) continue;
         bool recovered=record["status"]=="running";

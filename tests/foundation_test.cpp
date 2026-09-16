@@ -36,6 +36,7 @@ private slots:
         QVERIFY(service.execute("select", {{"side", "right"}, {"id", id}})["ok"].toBool());
         QFile file(dir.filePath("connections.json")); QVERIFY(file.open(QIODevice::ReadOnly));
         auto bytes = file.readAll(); QVERIFY(!bytes.contains("test-secret")); QVERIFY(!bytes.contains("password"));
+        file.close();
         Foundation restarted(dir.path()); QCOMPARE(restarted.snapshot()["left"].toString(), id);
         auto edit = connection(); edit["id"] = id; edit["name"] = "重命名"; edit.remove("password");
         QVERIFY(service.execute("save", edit)["ok"].toBool());
