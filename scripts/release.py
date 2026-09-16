@@ -67,12 +67,14 @@ def extract(archive):
 
 def diagnose_tests(build):
     suffix = '.exe' if os.name == 'nt' else ''
+    test_env = os.environ.copy()
+    test_env.update({'QT_QPA_PLATFORM': 'offscreen', 'SPEED_SYNC_ALLOW_MULTI_INSTANCE': '1'})
     for executable in sorted(build.glob(f'*-tests{suffix}')):
         print(f'[DIAGNOSTIC] Running {executable.name} directly', flush=True)
         try:
             result = subprocess.run(
                 [str(executable)], cwd=build, capture_output=True, text=True,
-                timeout=120, env=os.environ.copy(), check=False,
+                timeout=120, env=test_env, check=False,
             )
             print(f'[DIAGNOSTIC] {executable.name} exit={result.returncode}', flush=True)
             if result.stdout:
