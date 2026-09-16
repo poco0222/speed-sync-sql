@@ -2,7 +2,7 @@
 
 在仓库 **Actions → Desktop release → Run workflow** 中选择分支并运行。工作流文件首次合入默认分支后，才会出现手动触发入口。
 
-两个独立 job 使用 `windows-2022`（x64/MSVC 2022）和 `macos-15`（arm64），固定 Qt 6.10.2、Node 24.19.0、MySQL 客户端 8.0.46。前端按 `package-lock.json` 安装。QMYSQL 从匹配的 QtBase 源码构建，QtBase 下载后校验官方 SHA-256。
+两个独立 job 使用 `windows-2022`（x64/MSVC 2022）和 `macos-15`（arm64），固定 Python 3.12、Qt 6.10.2、Node 24.19.0、MySQL 客户端 8.0.46。前端按 `package-lock.json` 安装。QMYSQL 从匹配的 QtBase 源码构建，QtBase 下载后校验官方 SHA-256。
 
 ## 下载和运行
 
@@ -50,3 +50,11 @@ python scripts/release.py --qt-root <Qt目录>
 默认下载固定版本 MySQL 和 QtBase 到项目 `.local/release/`。可用 `--mysql-root <MySQL目录> --qtbase-source <QtBase源码目录>` 复用相同版本依赖。本机仅有 Command Line Tools 时可增加 `--allow-command-line-tools`，这不代表该 SDK/最低系统已获验证；Actions 不使用此选项。
 
 构建、暂存及产物均位于 `.local/release/`；失败返回非零，不执行 artifact 上传。日志保留在 Actions 运行页；不要把数据库密码加入命令行或日志。
+
+## 构建诊断
+
+Windows 从 Qt 官方下载 QtBase ZIP，使用选定 Python 的标准库解压；macOS 保留 tar.xz。两者均校验官方 SHA-256，MySQL/QtBase 解压限时 5 分钟。外部构建命令默认限时 20 分钟；CTest 单项 90 秒、部署加载检查 30 秒，job 总上限仍为 60 分钟。失败或超时停止，不上传产物。
+
+日志以 `[START]`、`[DONE]`、`[FAIL]` 显示下载、命令、部署和归档的结果与耗时。开头输出实际 Python 路径与版本；Qt 安装禁用内部 setup-python，发布脚本直接使用 setup-python 的解释器输出路径，避免 PATH 顺序改变 Python 版本。
+
+四个官方 Actions 已切到 Node 24 版本。Windows 的 `ilammy/msvc-dev-cmd@v1` 仍声明 Node 20，可能保留该 Action 的独立弃用提示；不等同于构建错误。

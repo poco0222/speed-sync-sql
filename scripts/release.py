@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build a self-contained distribution on a native Windows/macOS runner."""
 import argparse
+from contextlib import contextmanager
 import hashlib
 import json
 import os
@@ -10,6 +11,7 @@ import re
 import shutil
 import subprocess
 import tarfile
+import time
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,24 +19,50 @@ WORK = ROOT / '.local/release'
 QT_VERSION = '6.10.2'
 MYSQL_VERSION = '8.0.46'
 MAC = platform.system() == 'Darwin'
+EXTRACT_TIMEOUT = 300
+
+
+@contextmanager
+def log_stage(name):
+    started = time.monotonic()
+    print(f'[START] {name}', flush=True)
+    try:
+        yield
+    except BaseException as error:
+        print(f'[FAIL] {name} ({time.monotonic() - started:.1f}s): {error}', flush=True)
+        raise
+    else:
+        print(f'[DONE] {name} ({time.monotonic() - started:.1f}s)', flush=True)
 
 
 def run(*args, **kwargs):
-    return subprocess.run([str(a) for a in args], check=True, **kwargs)
+    kwargs.setdefault('timeout', 1200)
+    with log_stage(subprocess.list2cmdline([str(a) for a in args])):
+        return subprocess.run([str(a) for a in args], check=True, **kwargs)
 
 
 def output(*args):
-    return subprocess.check_output([str(a) for a in args], text=True)
+    return subprocess.check_output([str(a) for a in args], text=True, timeout=60)
 
 
 def download(url, destination):
     destination.parent.mkdir(parents=True, exist_ok=True)
     # A partial network response must never become a cached archive.
     temporary = destination.with_suffix(destination.suffix + '.partial')
-    with urllib.request.urlopen(url, timeout=120) as response, temporary.open('wb') as target:
-        shutil.copyfileobj(response, target)
-    temporary.replace(destination)
+    with log_stage(f'Download {destination.name}'):
+        with urllib.request.urlopen(url, timeout=120) as response, temporary.open('wb') as target:
+            shutil.copyfileobj(response, target)
+        temporary.replace(destination)
+        print(f'Downloaded {destination.stat().st_size} bytes', flush=True)
     return destination
+
+
+def extract(archive):
+    if archive.suffix == '.zip':
+        # Avoid runner-specific tar/xz resolution on Windows.
+        run(os.sys.executable, '-m', 'zipfile', '-e', archive, WORK, timeout=EXTRACT_TIMEOUT)
+    else:
+        run('tar', '-xf', archive, '-C', WORK, timeout=EXTRACT_TIMEOUT)
 
 
 def sha256(path):
@@ -49,21 +77,21 @@ def prepare_mysql():
     suffix = 'macos15-arm64.tar.gz' if MAC else 'winx64.zip'
     name = f'mysql-{MYSQL_VERSION}-{suffix}'
     archive = download(f'https://cdn.mysql.com/Downloads/MySQL-8.0/{name}', WORK / name)
-    if MAC:
-        run('tar', '-xzf', archive, '-C', WORK)
-    else:
-        run('tar', '-xf', archive, '-C', WORK)
+    extract(archive)
     return WORK / name.removesuffix('.tar.gz').removesuffix('.zip')
 
 
 def prepare_qtbase():
     name = f'qtbase-everywhere-src-{QT_VERSION}'
-    url = f'https://download.qt.io/archive/qt/6.10/{QT_VERSION}/submodules/{name}.tar.xz'
-    archive = download(url, WORK / f'{name}.tar.xz')
-    checksum = urllib.request.urlopen(url + '.sha256', timeout=30).read().decode().split()[0]
-    if sha256(archive) != checksum:
-        raise RuntimeError('QtBase source checksum mismatch')
-    run('tar', '-xf', archive, '-C', WORK)
+    suffix = '.tar.xz' if MAC else '.zip'
+    url = f'https://download.qt.io/archive/qt/6.10/{QT_VERSION}/submodules/{name}{suffix}'
+    archive = download(url, WORK / f'{name}{suffix}')
+    with log_stage('Verify QtBase SHA-256'):
+        with urllib.request.urlopen(url + '.sha256', timeout=30) as response:
+            checksum = response.read().decode().split()[0]
+        if sha256(archive) != checksum:
+            raise RuntimeError('QtBase source checksum mismatch')
+    extract(archive)
     return WORK / name
 
 
@@ -240,6 +268,7 @@ def main():
     if platform.machine().lower() not in (('arm64',) if MAC else ('amd64', 'x86_64')):
         parser.error('Unexpected runner architecture')
     os.chdir(ROOT)
+    print(f'Python: {os.sys.executable} ({platform.python_version()})', flush=True)
     WORK.mkdir(parents=True, exist_ok=True)
     qt = args.qt_root.resolve()
     mysql = args.mysql_root.resolve() if args.mysql_root else prepare_mysql()
@@ -278,7 +307,8 @@ def main():
         shutil.rmtree(stage)
     stage.mkdir(parents=True)
     app = build / ('speed-sync-sql.app' if MAC else 'speed-sync-sql.exe')
-    deployed = deploy_macos(qt, mysql, app, stage) if MAC else deploy_windows(qt, mysql, app, stage)
+    with log_stage('Deploy runtime dependencies'):
+        deployed = deploy_macos(qt, mysql, app, stage) if MAC else deploy_windows(qt, mysql, app, stage)
     clean_env = {k: v for k, v in os.environ.items() if not k.startswith(('QT_', 'QML', 'DYLD_', 'LD_LIBRARY_PATH', 'SPEED_SYNC_'))}
     clean_env['PATH'] = '/usr/bin:/bin' if MAC else str(Path(os.environ['SystemRoot']) / 'System32')
     check = run(deployed, '--deployment-check', env=clean_env, capture_output=True, text=True, timeout=30)
@@ -303,15 +333,16 @@ def main():
     if artifacts.exists():
         shutil.rmtree(artifacts)
     artifacts.mkdir()
-    if MAC:
-        archive = artifacts / f'{name}.tar.gz'
-        with tarfile.open(archive, 'w:gz') as tar:
-            tar.add(stage, arcname=name)
-    else:
-        archive = Path(shutil.make_archive(str(artifacts / name), 'zip', stage.parent, name))
-    digest = sha256(archive)
-    (artifacts / (archive.name + '.sha256')).write_text(f'{digest}  {archive.name}\n')
-    print(f'Distribution: {archive}')
+    with log_stage('Package distribution and SHA-256'):
+        if MAC:
+            archive = artifacts / f'{name}.tar.gz'
+            with tarfile.open(archive, 'w:gz') as tar:
+                tar.add(stage, arcname=name)
+        else:
+            archive = Path(shutil.make_archive(str(artifacts / name), 'zip', stage.parent, name))
+        digest = sha256(archive)
+        (artifacts / (archive.name + '.sha256')).write_text(f'{digest}  {archive.name}\n')
+    print(f'Distribution: {archive}', flush=True)
 
 
 if __name__ == '__main__':

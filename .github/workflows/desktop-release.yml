@@ -22,15 +22,16 @@ jobs:
             runner: macos-15
             qt-arch: clang_64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7.0.0
         with:
           node-version: '24.19.0'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7.0.0
+        id: python
         with:
           python-version: '3.12'
       - uses: ilammy/msvc-dev-cmd@v1
@@ -39,14 +40,18 @@ jobs:
           arch: x64
       - uses: jurplel/install-qt-action@v4
         with:
+          setup-python: false
           version: '6.10.2'
           arch: ${{ matrix.qt-arch }}
           modules: 'qtwebengine qtwebchannel qtpositioning'
           cache: true
       - name: Build, test and package
-        run: python scripts/release.py --qt-root "${{ env.QT_ROOT_DIR }}"
+        shell: pwsh
+        env:
+          RELEASE_PYTHON: ${{ steps.python.outputs.python-path }}
+        run: '& $env:RELEASE_PYTHON -u scripts/release.py --qt-root "$env:QT_ROOT_DIR"'
       - name: Upload distribution
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: speed-sync-sql-${{ matrix.platform }}-${{ github.run_number }}
           path: .local/release/artifacts/*

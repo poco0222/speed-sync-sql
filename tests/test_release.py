@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import zipfile
 from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location('release', Path(__file__).resolve().parents[1] / 'scripts/release.py')
@@ -13,6 +14,25 @@ spec.loader.exec_module(release)
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_extract_zip_uses_python_zipfile(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            archive = root / 'sample.zip'
+            with zipfile.ZipFile(archive, 'w') as zf:
+                zf.writestr('qtbase/file.txt', 'ok')
+            with patch.object(release, 'WORK', root / 'work'), patch.object(release, 'run') as run:
+                release.extract(archive)
+            run.assert_called_once_with(sys.executable, '-m', 'zipfile', '-e', archive, root / 'work', timeout=release.EXTRACT_TIMEOUT)
+
+    def test_log_stage_reports_failure(self):
+        with patch('builtins.print') as output:
+            with self.assertRaisesRegex(RuntimeError, 'boom'):
+                with release.log_stage('fixture'):
+                    raise RuntimeError('boom')
+        lines = [call.args[0] for call in output.call_args_list]
+        self.assertTrue(lines[0].startswith('[START] fixture'))
+        self.assertTrue(lines[1].startswith('[FAIL] fixture'))
+
     def test_failed_command_is_fatal(self):
         with self.assertRaises(subprocess.CalledProcessError):
             release.run(sys.executable, '-c', 'raise SystemExit(7)')
