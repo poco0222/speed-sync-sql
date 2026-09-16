@@ -123,6 +123,11 @@ def deploy_windows(qt, mysql, app, stage):
     run(qt / 'bin/windeployqt.exe', '--release', '--compiler-runtime', '--dir', stage, app)
     plugin_dir = stage / 'sqldrivers'
     plugin_dir.mkdir(exist_ok=True)
+    # The app only supports MySQL; remove drivers pulled in by windeployqt
+    # so their optional client libraries are not treated as release dependencies.
+    for plugin in plugin_dir.glob('*.dll'):
+        if plugin.name.lower() != 'qsqlmysql.dll':
+            plugin.unlink()
     shutil.copy2(WORK / 'driver/plugins/sqldrivers/qsqlmysql.dll', plugin_dir)
     # Resolve every non-system import, including MySQL SSL/crypto and the MSVC CRT.
     search = [stage, mysql / 'lib', mysql / 'bin', qt / 'bin']
