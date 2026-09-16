@@ -65,6 +65,24 @@ def extract(archive):
         run('tar', '-xf', archive, '-C', WORK, timeout=EXTRACT_TIMEOUT)
 
 
+def diagnose_tests(build):
+    suffix = '.exe' if os.name == 'nt' else ''
+    for executable in sorted(build.glob(f'*-tests{suffix}')):
+        print(f'[DIAGNOSTIC] Running {executable.name} directly', flush=True)
+        try:
+            result = subprocess.run(
+                [str(executable)], cwd=build, capture_output=True, text=True,
+                timeout=120, env=os.environ.copy(), check=False,
+            )
+            print(f'[DIAGNOSTIC] {executable.name} exit={result.returncode}', flush=True)
+            if result.stdout:
+                print(f'[DIAGNOSTIC] stdout:\n{result.stdout}', flush=True)
+            if result.stderr:
+                print(f'[DIAGNOSTIC] stderr:\n{result.stderr}', flush=True)
+        except Exception as error:
+            print(f'[DIAGNOSTIC] {executable.name} launcher error: {error}', flush=True)
+
+
 def sha256(path):
     digest = hashlib.sha256()
     with path.open('rb') as stream:
@@ -304,6 +322,7 @@ def main():
     except subprocess.CalledProcessError:
         # CTest can suppress a native test's output when the process exits early;
         # rerun verbosely so CI contains the actual assertion or loader error.
+        diagnose_tests(build)
         print('[DIAGNOSTIC] Re-running failed CTest suite verbosely', flush=True)
         run('ctest', '--test-dir', build, '--output-on-failure', '--verbose', '--timeout', '90')
         raise
