@@ -3,7 +3,7 @@ name: windows-release-hang
 language: zh-CN
 phase: verify
 status: active
-state_version: 9
+state_version: 16
 brief: brief.md
 shape_confirmation_hash: 7a8227c983c0c57f43f74c9e722fd1563229a47b12e4e790d9a05f27048fb4d3
 spec_changes:
@@ -19,8 +19,8 @@ loop:
   stage: verify-ready
   goal_cycle: 1
   iteration: 2
-  attempt: 1
-  retry_epoch: 0
+  attempt: 4
+  retry_epoch: 1
   failed_iteration_count: 0
   no_progress_count: 0
   execution_failure_count: 0
@@ -132,6 +132,39 @@ history:
       text: 用户确认继续修改实现：补充解压、超时和日志回归测试，并重新验证；远程 Windows/macOS 重跑仍待推送后执行。
       truncated: false
     completed_at: 2026-09-16T01:38:15.612Z
+  - goal_cycle: 1
+    iteration: 2
+    attempt: 1
+    outcome: execution-error
+    unresolved_ids: []
+    summary:
+      text: 已派发的只读 Verifier execution ref
+        skill-coordinated:verifier:b488ef42-022f-428c-bd18-209c007541e9 自
+        2026-09-16T01:41:22Z 后未返回结果；当前无对应运行进程，已超过正常等待窗口。
+      truncated: false
+    completed_at: 2026-09-16T04:34:53.324Z
+  - goal_cycle: 1
+    iteration: 2
+    attempt: 2
+    outcome: execution-error
+    unresolved_ids: []
+    summary:
+      text: 第二次只读 Verifier execution ref
+        skill-coordinated:verifier:e2b02f38-3aac-4bc5-b97b-8b7f75f6319a 自
+        2026-09-16T04:36:54Z 后未返回结果；当前已超过正常等待窗口。
+      truncated: false
+    completed_at: 2026-09-16T04:49:29.352Z
+  - goal_cycle: 1
+    iteration: 2
+    attempt: 3
+    outcome: execution-error
+    unresolved_ids: []
+    summary:
+      text: 第三次只读 Verifier execution ref
+        skill-coordinated:verifier:41470800-9567-419e-8245-62aff999b39a 自
+        2026-09-16T04:50:31Z 后未返回结果；本机无对应执行进程。
+      truncated: false
+    completed_at: 2026-09-16T04:53:34.623Z
 history_overflow:
   dropped_entries: 0
   first_dropped_at: null
