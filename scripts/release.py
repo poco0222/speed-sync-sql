@@ -129,6 +129,10 @@ def deploy_windows(qt, mysql, app, stage):
         if plugin.name.lower() != 'qsqlmysql.dll':
             plugin.unlink()
     shutil.copy2(WORK / 'driver/plugins/sqldrivers/qsqlmysql.dll', plugin_dir)
+    # QtPositioning's NMEA backend pulls QtSerialPort, which is not part of
+    # the runtime modules used by this app.
+    for plugin in (stage / 'position').glob('qtposition_nmea*.dll'):
+        plugin.unlink()
     # Resolve every non-system import, including MySQL SSL/crypto and the MSVC CRT.
     search = [stage, mysql / 'lib', mysql / 'bin', qt / 'bin']
     redist = os.environ.get('VCToolsRedistDir')
