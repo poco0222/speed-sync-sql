@@ -1,5 +1,5 @@
 #include "foundation.h"
-#include <QApplication>
+#include <QCoreApplication>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
@@ -129,7 +129,7 @@ private slots:
 };
 
 int main(int argc,char **argv) {
-    QApplication app(argc,argv);
+    QCoreApplication app(argc,argv);
     if(argc>1&&QByteArray(argv[1])=="--data") {
         // Only process outcomes are fixtures; real MySQL tests verify SQL behavior.
         QFile in;if(!in.open(stdin,QIODevice::ReadOnly))return 1;const auto p=QJsonDocument::fromJson(in.readAll()).object();

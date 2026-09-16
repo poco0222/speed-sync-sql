@@ -106,5 +106,5 @@ private slots:
         QVERIFY(service.execute("save", edit)["ok"].toBool());
     }
 };
-QTEST_MAIN(FoundationTest)
+QTEST_GUILESS_MAIN(FoundationTest)
 #include "foundation_test.moc"
