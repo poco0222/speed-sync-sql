@@ -123,10 +123,9 @@ def deploy_windows(qt, mysql, app, stage):
     run(qt / 'bin/windeployqt.exe', '--release', '--compiler-runtime', '--dir', stage, app)
     plugin_dir = stage / 'sqldrivers'
     plugin_dir.mkdir(exist_ok=True)
-    # The app only supports MySQL; remove drivers pulled in by windeployqt
-    # so their optional client libraries are not treated as release dependencies.
+    # Keep MySQL and the local SQLite store, excluding optional database clients.
     for plugin in plugin_dir.glob('*.dll'):
-        if plugin.name.lower() != 'qsqlmysql.dll':
+        if plugin.name.lower() not in {'qsqlmysql.dll', 'qsqlite.dll'}:
             plugin.unlink()
     shutil.copy2(WORK / 'driver/plugins/sqldrivers/qsqlmysql.dll', plugin_dir)
     # QtPositioning's NMEA backend pulls QtSerialPort, which is not part of
