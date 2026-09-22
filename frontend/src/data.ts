@@ -48,3 +48,50 @@ export function copyOriginalText(text:string):void {
  try{document.execCommand('copy');if(!copied)throw new Error('复制失败，请聚焦应用后重试');}
  finally{document.removeEventListener('copy',onCopy,{capture:true});}
 }
+
+export type DataSettings = {key:string[];fields:string[];filters:DataFilter[]};
+export function sameDataSettings(a:DataSettings,b:DataSettings):boolean {
+ const effective=(settings:DataSettings)=>({...settings,filters:settings.filters.map(filter=>({...filter,value:filter.op.includes('NULL')?'':filter.value}))});
+ return JSON.stringify(effective(a))===JSON.stringify(effective(b));
+}
+export function validateDataSettings(settings:DataSettings,preparation:Preparation):string {
+ if(!settings.fields.length)return '请选择参与字段';
+ if(settings.key.length&&!preparation.keys.some(key=>JSON.stringify(key.fields)===JSON.stringify(settings.key)))return '请选择有效的完整可靠键';
+ if(settings.fields.some(name=>!preparation.fields.some(field=>field.name===name&&field.compatible)))return '参与字段已失效';
+ if(settings.filters.length>32)return '最多支持 32 个共享条件';
+ for(const filter of settings.filters){
+  const field=preparation.fields.find(field=>field.name===filter.field&&field.compatible);
+  if(!field||!operatorsForType(field.type).includes(filter.op))return '筛选字段或操作符无效';
+  if(filter.op.includes('NULL'))continue;
+  const value=filter.value,type=field.type.toLowerCase();
+  if(value.length>4096)return '筛选值最多 4096 字符';
+  const integer=/^(tinyint|smallint|mediumint|int|bigint)\b/.exec(type);
+  if(integer){
+   if(!/^-?[0-9]+$/.test(value))return '整数筛选值格式无效';
+   const bits=BigInt(({tinyint:8,smallint:16,mediumint:24,int:32,bigint:64} as Record<string,number>)[integer[1]]),unsigned=type.includes('unsigned');
+   const number=BigInt(value),bound=1n<<(unsigned?bits:bits-1n);
+   if(unsigned?value.startsWith('-')||number>=bound:number < -bound||number>=bound)return '整数筛选值超出字段范围';
+  }
+  if(/^decimal\b/.test(type)){
+   const definition=/decimal\(([0-9]+),([0-9]+)\)/.exec(type),number=/^-?([0-9]+)(?:\.([0-9]+))?$/.exec(value);
+   if(!definition)return 'DECIMAL 定义不支持';
+   if(!number)return 'DECIMAL 筛选应使用普通十进制文本';
+   const whole=number[1].replace(/^0+/,''),scale=Number(definition[2]);
+   if(whole.length>Number(definition[1])-scale||(number[2]?.length??0)>scale||type.includes('unsigned')&&value.startsWith('-'))return 'DECIMAL 筛选值超出精度或范围';
+  }
+  if(/^(float|double|real)\b/.test(type)&&(!/^-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$/.test(value)||!Number.isFinite(Number(value))))return '浮点筛选值格式或范围无效';
+  if(/^(binary|varbinary|tinyblob|blob|mediumblob|longblob|bit)\b/.test(type)&&! /^(?:[0-9a-fA-F]{2})*$/.test(value))return '二进制筛选值须为完整 HEX 字节';
+  if(/^bit\b/.test(type)){
+   const bits=Number(/^bit\(([0-9]+)\)/.exec(type)?.[1]);
+   if(!value||bits<1||bits>64||!Number.isInteger(bits)||BigInt(`0x${value}`)>=(1n<<BigInt(bits)))return 'BIT 筛选超出字段范围';
+  }
+  if(/^(date|datetime|timestamp)\b/.test(type)){
+   const date=value.slice(0,10),parsed=new Date(`${date}T00:00:00Z`);
+   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date.startsWith('0000')||Number.isNaN(parsed.getTime())||parsed.toISOString().slice(0,10)!==date)return '日期筛选值无效';
+   if(type==='date'?value.length!==10:!/^\d{4}-\d{2}-\d{2} ([01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,6})?$/.test(value))return '时间筛选值格式无效';
+  }
+  if(/^time\b/.test(type)){const match=/^-?(\d{1,3}):[0-5]\d:[0-5]\d(?:\.\d{1,6})?$/.exec(value);if(!match||Number(match[1])>838)return 'TIME 筛选值无效';}
+  if(/^year\b/.test(type)&&(!/^\d{4}$/.test(value)||(value!=='0000'&&(Number(value)<1901||Number(value)>2155))))return 'YEAR 筛选值无效';
+ }
+ return '';
+}

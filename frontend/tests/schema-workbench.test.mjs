@@ -1,0 +1,37 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+import * as schema from '../src/schema.ts';
+import * as sync from '../src/sync.ts';
+import {Freshness} from '../src/freshness.ts';
+
+test('mode switches retain the data element identity while data writes lock sibling contexts without self-locking',()=>{
+ const slots=[],effects=[],writeStates=[];let cursor=0,tree;
+ const hooks={forwardRef:f=>f,useState:initial=>{const i=cursor++;if(!(i in slots))slots[i]=typeof initial==='function'?initial():initial;return[slots[i],value=>{slots[i]=typeof value==='function'?value(slots[i]):value;}];},useRef:initial=>{const i=cursor++;return slots[i]??={current:initial};},useEffect:(fn,deps)=>{const i=cursor++,old=slots[i];if(!old||!deps||deps.some((d,j)=>d!==old.deps[j])){slots[i]={deps,cleanup:old?.cleanup};effects.push(()=>{slots[i].cleanup?.();slots[i].cleanup=fn();});}},useImperativeHandle:(ref,fn)=>{ref.current=fn();}};
+ const antd=Object.fromEntries(['Alert','AutoComplete','Button','Checkbox','Empty','Slider','Space','Table','Tabs','Tag'].map(name=>[name,name]));
+ antd.Input={Search:'Search'};antd.Typography={Title:'Title',Text:'Text',Paragraph:'Paragraph'};antd.message={useMessage:()=>[{success(){},error(){}},null]};
+ const jsx=(type,props,key)=>({type,props,key});const module={exports:{}};
+ const code=ts.transpileModule(fs.readFileSync(new URL('../src/SchemaWorkbench.tsx',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
+ vm.runInNewContext(code,{exports:module.exports,require:name=>({'react':hooks,'antd':antd,'./schema':schema,'./sync':sync,'./freshness':{Freshness},'./bridge':{request:async()=>({ok:true})},'./SyncPanel':{SyncPanel:'SyncPanel'},'./DataWorkbench':{DataWorkbench:'DataWorkbench'},'react/jsx-runtime':{jsx,jsxs:jsx,Fragment:'Fragment'}}[name]),window:{matchMedia:()=>({matches:false})},setInterval:()=>1,clearInterval(){}});
+ const ref={},state={left:'left',right:'right',connections:[{id:'left',name:'Left'},{id:'right',name:'Right'}],workspace:{left:{database:'a',table:'t'},right:{database:'b',table:'t'}}};
+ const render=()=>{cursor=0;tree=module.exports.SchemaWorkbench({state,disabled:false,onRunning(){},onDataRunning(){},onDataWriteRunning:value=>writeStates.push(value)},ref);while(effects.length)effects.shift()();};
+ const nodes=type=>{const found=[];const walk=(n,path=[])=>{if(!n||typeof n!=='object')return;if(Array.isArray(n)){n.forEach((child,i)=>walk(child,[...path,i]));return;}if(n.type===type)found.push({...n,path:path.join('/')});walk(n.props?.children,[...path,'children']);};walk(tree);return found;};
+ const mode=()=>nodes('Tabs').find(n=>n.props.className==='workbench-tabs');
+ const data=()=>{assert.equal(nodes('DataWorkbench').length,1);return nodes('DataWorkbench')[0];};
+ const start=()=>nodes('Button').find(n=>n.props.children==='开始比对');
+ render();assert.equal(nodes('DataWorkbench').length,0);
+ mode().props.onChange('data');render();const identity={key:data().key,path:data().path};
+ const stable=()=>{assert.deepEqual({key:data().key,path:data().path},identity);assert.equal(data().props.disabled,false);};
+ stable();assert.equal(start().props.disabled,false);
+ data().props.onMergeRunning(true);render();stable();
+ mode().props.onChange('schema');render();stable();
+ assert.equal(start().props.disabled,true);assert.equal(nodes('SyncPanel')[0].props.disabled,true);
+ const databases=nodes('AutoComplete').filter(n=>n.props.id.endsWith('-database'));
+ assert.equal(databases.length,2);assert.ok(databases.every(n=>n.props.disabled));
+ mode().props.onChange('data');render();stable();
+ data().props.onMergeRunning(false);render();stable();
+ assert.equal(start().props.disabled,false);assert.equal(nodes('SyncPanel')[0].props.disabled,false);
+ assert.ok(nodes('AutoComplete').every(n=>!n.props.disabled));assert.deepEqual(writeStates,[true,false]);
+});

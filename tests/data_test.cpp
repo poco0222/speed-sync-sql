@@ -68,6 +68,39 @@ private slots:
         QVERIFY(!readDataResult(dir.path(),"data-page",{{"status","';DROP TABLE rows"}},true)["ok"].toBool());
         QVERIFY(!readDataResult(dir.path(),"data-detail",{{"rowId","1"},{"field","text"},{"side","left"},{"offset",999999}},true)["ok"].toBool());
     }
+    void differencePagesAndKeyIntersection() {
+        QTemporaryDir dir; const QString name="test-difference-pages";
+        const QStringList statuses{"same","different","same","left-only","same","right-only","different","unmatched"};
+        {
+            auto db=QSqlDatabase::addDatabase("QSQLITE",name); db.setDatabaseName(dir.path()+"/rows.sqlite"); QVERIFY(db.open()); QSqlQuery q(db);
+            QVERIFY(q.exec("CREATE TABLE rows(id INTEGER PRIMARY KEY, key_text TEXT, status TEXT, changed TEXT)"));
+            for(int i=0;i<statuses.size();++i) {
+                q.prepare("INSERT INTO rows VALUES(?,?,?,'[]')"); q.addBindValue(i+1);
+                q.addBindValue(QString::fromUtf8(QJsonDocument(QJsonArray{"9007199254740993",QString::number(i+1)}).toJson(QJsonDocument::Compact)));
+                q.addBindValue(statuses[i]); QVERIFY(q.exec());
+            }
+        }
+        QSqlDatabase::removeDatabase(name);
+        const QStringList expected{"2","4","6","7"};
+        for(int offset=0;offset<=4;offset+=2) {
+            auto page=readDataResult(dir.path(),"data-page",{{"status","differences"},{"limit",2},{"offset",offset}},true);
+            QVERIFY(page["ok"].toBool()); QCOMPARE(page["total"].toInt(),4);
+            auto rows=page["rows"].toArray(); QCOMPARE(rows.size(),offset<4?2:0);
+            for(int i=0;i<rows.size();++i) QCOMPARE(rows[i].toObject()["id"].toString(),expected[offset+i]);
+        }
+        for(int id:{1,4,8}) {
+            auto page=readDataResult(dir.path(),"data-page",{{"status","differences"},{"key",QJsonArray{"9007199254740993",QString::number(id)}}},true);
+            QVERIFY(page["ok"].toBool()); QCOMPARE(page["total"].toInt(),id==4?1:0); QCOMPARE(page["rows"].toArray().size(),id==4?1:0);
+        }
+        auto partialKey=readDataResult(dir.path(),"data-page",{{"status","differences"},{"key",QJsonArray{"9007199254740993"}}},true);
+        QVERIFY(partialKey["ok"].toBool()); QCOMPARE(partialKey["total"].toInt(),0);
+        for(const auto &status:QStringList{"all","same","different","left-only","right-only","unmatched"}) {
+            auto page=readDataResult(dir.path(),"data-page",{{"status",status}},true);
+            QVERIFY(page["ok"].toBool()); QCOMPARE(page["total"].toInt(),status=="all"?statuses.size():statuses.count(status));
+        }
+        auto incomplete=readDataResult(dir.path(),"data-page",{{"status","differences"}},false);
+        QVERIFY(incomplete["ok"].toBool()); QCOMPARE(incomplete["total"].toInt(),2); QCOMPARE(incomplete["rows"].toArray().size(),2);
+    }
     void staleLifecycle() {
         QTemporaryDir dir; QString temp;
         { Foundation service(dir.path()); auto folders=QDir(dir.path()).entryList({"data-tmp-*"},QDir::Dirs|QDir::NoDotAndDotDot); QCOMPARE(folders.size(),1); temp=dir.path()+"/"+folders[0];

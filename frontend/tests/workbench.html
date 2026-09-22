@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>隔离工作台 UI 验证</title></head>
+<body>
+<div style="position:fixed;left:0;right:0;bottom:0;z-index:2000;background:#fff1b8;color:#613400;text-align:center;font:12px sans-serif;pointer-events:none">隔离测试数据 · 无数据库连接 · 写入仅内存模拟 · 执行保持运行直到请求停止</div>
+<div id="root"></div>
+<script type="module">
+import './workbench-mock.mjs';
+await import('/src/main.tsx');
+</script>
+</body>
+</html>

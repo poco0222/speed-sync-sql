@@ -48,3 +48,38 @@ test('copy event preserves full text including empty strings and always removes 
   assert.equal(removed,3);
  }finally{globalThis.document=original;}
 });
+
+test('draft validation preserves precision and rejects malformed typed values',async()=>{
+ const {validateDataSettings,sameDataSettings}=await import('../src/data.ts');
+ const prep={fields:[{name:'id',type:'bigint',compatible:true},{name:'day',type:'date',compatible:true},{name:'bytes',type:'blob',compatible:true}],keys:[{name:'PRIMARY',fields:['id']}]};
+ const config={key:['id'],fields:['id'],filters:[{field:'id',op:'=',value:'9007199254740993'}]};
+ assert.equal(validateDataSettings(config,prep),'');
+ assert.equal(sameDataSettings(config,structuredClone(config)),true);
+ for(const filter of [{field:'id',op:'=',value:'abc'},{field:'day',op:'=',value:'2026-02-30'},{field:'bytes',op:'=',value:'abc'},{field:'missing',op:'=',value:''}])assert.notEqual(validateDataSettings({...config,filters:[filter]},prep),'');
+ assert.equal(sameDataSettings(config,{...config,filters:[]}),false);
+ assert.equal(validateDataSettings({...config,fields:[]},prep),'请选择参与字段');
+});
+
+test('filter bounds use full definitions and exact integers, decimals and BIT bytes',async()=>{
+ const {validateDataSettings}=await import('../src/data.ts');
+ const check=(type,value)=>validateDataSettings({key:[],fields:['v'],filters:[{field:'v',op:'=',value}]},{fields:[{name:'v',type,compatible:true}],keys:[]});
+ for(const [type,bits] of [['tinyint',8],['smallint',16],['mediumint',24],['int',32],['bigint',64]]){
+  const half=1n<<BigInt(bits-1),maxUnsigned=(1n<<BigInt(bits))-1n;
+  for(const value of [String(-half),String(half-1n),'00000','-0'])assert.equal(check(`${type}(20)`,value),'',`${type} ${value}`);
+  for(const value of [String(-half-1n),String(half)])assert.notEqual(check(type,value),'',`${type} ${value}`);
+  for(const value of ['0','000001',String(maxUnsigned)])assert.equal(check(`${type} unsigned`,value),'',`${type} unsigned ${value}`);
+  for(const value of ['-0','-1',String(maxUnsigned+1n)])assert.notEqual(check(`${type} unsigned`,value),'',`${type} unsigned ${value}`);
+ }
+ for(const value of ['999.99','-999.99','00000999.99','0','00000.00','-0.00'])assert.equal(check('decimal(5,2)',value),'',value);
+ for(const value of ['1000','0.001','1.230','1e2'])assert.notEqual(check('decimal(5,2)',value),'',value);
+ assert.equal(check('decimal(2,2)','000.99'),'');assert.notEqual(check('decimal(2,2)','1.00'),'');
+ for(const value of ['-0','-0.00','-1.00'])assert.notEqual(check('decimal(5,2) unsigned',value),'');
+ assert.equal(check('decimal(65,30)','9'.repeat(35)+'.'+'9'.repeat(30)),'');
+ assert.notEqual(check('decimal(65,30)','9'.repeat(36)+'.'+'9'.repeat(30)),'');
+ for(const [type,accepted,rejected] of [['bit(1)',['00','01','0001'],['','02','1']],['bit(9)',['0000','01ff'],['0200']],['bit(64)',['ffffffffffffffff','0000ffffffffffffffff'],['010000000000000000']]]){
+  for(const value of accepted)assert.equal(check(type,value),'',`${type} ${value}`);
+  for(const value of rejected)assert.notEqual(check(type,value),'',`${type} ${value}`);
+ }
+ assert.equal(check("enum('bit','binary','blob')",'bit'),'');
+ assert.equal(check('blob',''),'');assert.equal(check('varbinary(2)','00ff'),'');
+});

@@ -422,10 +422,11 @@ QJsonObject readDataResult(const QString &path,const QString &operation,const QJ
         auto bounded=[&](const QString &name,int fallback,int low,int high) { const auto v=args[name]; if(v.isUndefined()) return fallback; require(v.isDouble() && v.toDouble()==v.toInt(-1) && v.toInt()>=low && v.toInt()<=high,"分页或分块参数无效","validation"); return v.toInt(); };
         if(operation=="data-page") {
             int offset=bounded("offset",0,0,2147483647),limit=bounded("limit",50,1,200); auto status=args["status"].toString("all");
-            require(QStringList{"all","same","different","left-only","right-only","unmatched"}.contains(status),"状态筛选无效","validation");
+            require(QStringList{"all","differences","same","different","left-only","right-only","unmatched"}.contains(status),"状态筛选无效","validation");
             QStringList predicates; QVariantList binds;
             if(!complete) predicates<<"status IN ('same','different','unmatched')";
-            if(status!="all") { predicates<<"status=?"; binds<<status; }
+            if(status=="differences") predicates<<"status IN ('different','left-only','right-only')";
+            else if(status!="all") { predicates<<"status=?"; binds<<status; }
             if(args.contains("key")) { require(args["key"].isArray(),"定位键格式无效","validation"); const auto key=args["key"].toArray(); for(auto v:key) require(v.isString(),"定位键必须为精确文本","validation"); predicates<<"key_text=?"; binds<<json(key); }
             if(args.contains("side")) { const auto side=args["side"].toString(); require(side=="left" || side=="right","浏览端无效","validation"); predicates<<"EXISTS (SELECT 1 FROM cells WHERE row_id=rows.id AND side=?)"; binds<<side; }
             auto where=predicates.isEmpty()?QString{}:" WHERE "+predicates.join(" AND "); q.prepare("SELECT COUNT(*) FROM rows"+where); for(const auto &v:binds) q.addBindValue(v); execute(q); require(q.next(),"无法读取页计数","storage"); const auto total=q.value(0).toLongLong();
