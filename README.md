@@ -21,6 +21,14 @@ open build/speed-sync-sql.app
 
 脚本安装项目内锁定的前端依赖，构建本地资源、原生程序及测试。不安装或升级全局 Qt。macOS 应用当前依赖开发机 Qt 和 MySQL 客户端库，不是可直接发给干净机器的发行包。
 
+### VS Code F5 调试（macOS）
+
+用 VS Code 打开仓库根目录，安装并启用 Microsoft **C/C++** 扩展（`ms-vscode.cpptools`）。完成上述 Qt、Node 和 QMYSQL 准备后，在 C++ 源码中设置断点，按 **F5** 选择 **Speed Sync SQL (macOS)**；使用 LLDB 调试原生主进程。**Shift+F5** 停止调试。
+
+预启动任务复用 `scripts/build-macos.sh`：安装锁定的前端依赖、构建前端、配置及编译 Debug 程序，并运行现有测试。每次 F5 都执行该流程；构建或测试失败时中止启动，不运行旧程序。任务通过登录 zsh 获取 Node 等工具路径，支持脚本原有的 `SPEED_SYNC_QT_ROOT`、`SPEED_SYNC_QT_TOOLS` 和 `SPEED_SYNC_MYSQL_PLUGIN` 环境变量。
+
+调试沿用正常应用数据目录，不自动连接数据库。此配置仅支持当前 macOS arm64 环境的 C++ 主进程；React/TypeScript 断点和数据库工作子进程不会自动附加，Windows 调试需另行配置。
+
 ### 补齐 QMYSQL
 
 现有 Qt 安装不含 QMYSQL。只需用同版本 QtBase 源码构建插件，无须重装 Qt。当前源码与插件放在项目 `.local/`，未写入 DevTools 的 Qt 安装。

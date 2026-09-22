@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Speed Sync SQL (macOS)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/speed-sync-sql.app/Contents/MacOS/speed-sync-sql",
+      "cwd": "${workspaceFolder}",
+      "args": [],
+      "MIMode": "lldb",
+      "stopAtEntry": false,
+      "externalConsole": false,
+      "preLaunchTask": "Build macOS Debug"
+    }
+  ]
+}

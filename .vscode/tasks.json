@@ -1,0 +1,14 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build macOS Debug",
+      "type": "process",
+      "command": "/bin/zsh",
+      "args": ["-l", "${workspaceFolder}/scripts/build-macos.sh"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": ["$gcc"],
+      "group": { "kind": "build", "isDefault": true }
+    }
+  ]
+}
