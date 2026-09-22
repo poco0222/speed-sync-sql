@@ -1,0 +1,354 @@
+schema: comet.native.v4
+name: sync-workbench-flow
+language: zh-CN
+phase: archive
+status: done
+state_version: 34
+brief: brief.md
+shape_confirmation_hash: e00c5f1a91f19a137cda3b9240b28051f1264285aa38cfac62f55bbc5829a7b7
+spec_changes:
+  - capability: workbench-experience
+    operation: modify
+    source: specs/workbench-experience/spec.md
+workspace:
+  isolation: current
+  change_branch: main
+  target_branch: main
+  finish: null
+loop:
+  stage: done
+  goal_cycle: 6
+  iteration: 1
+  attempt: 1
+  retry_epoch: 0
+  failed_iteration_count: 0
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: null
+acceptance:
+  - id: A1
+    source: brief.md
+    text: A1：工作台始终显示实际来源及目标连接、库和当前表；结构与数据共用一个方向，调整方向后旧计划失效，预览与最终确认的写入对象一致。
+    result: passed
+    reason:
+      text: 来源/目标显示、共享方向及计划失效逻辑本轮未变，复用上一轮已通过证据和当前候选绑定检查。
+      truncated: false
+  - id: A2
+    source: brief.md
+    text: A2：用户主动载入库表后，可在左侧搜索并通过无数据库父节点的 Ant Design Tree
+      单选来源表，默认配对目标同名表并可修改为不同名；来源无手动输入入口，搜索无匹配时显示未找到；切换下一张表保留两端连接与库、清理旧结果和计划。不依据清单缺项推断目标表不存在。
+    result: passed
+    reason:
+      text: 独立核查当前 SchemaWorkbench.tsx:126,138：sourceTables 仅筛选已载入清单；Tree
+        只由该清单生成，搜索文本不传入 choose；来源手动输入和使用此表名入口均不存在。未载入提示请先载入表清单，空结果提示未找到表。结合本轮
+        CUA 记录，not_a_table 无结果、清空恢复列表。主动载入、扁平 Tree、同名配对及目标映射保持。
+      truncated: false
+  - id: A3
+    source: brief.md
+    text: A3：结构模式保留对象选择、全部对齐及原始定义；数据模式一次点击开始比对完成键字段准备和扫描，不要求单独点击读取键字段，不要求先测试连接。全表默认范围可见，无可靠键时明确阻止差异同步并保留独立浏览入口。
+    result: passed
+    reason:
+      text: 本轮仅删除来源备用输入并增加空状态，未改变结构策略、一次数据启动、可靠键阻断及独立浏览；复用上一轮有效验收及当前候选测试。
+      truncated: false
+  - id: A4
+    source: brief.md
+    text: A4：当前表的结构与数据结果区域优先显示差异，通过 Ant Design Table
+      行下展开完整原值，保留分页、定位、条件草稿、取消与应用行为；列表筛选不冒充同步范围，未知/失败/不完整结果不显示为相同。
+    result: passed
+    reason:
+      text: 差异 Table 行下展开、完整原值、分页及条件草稿均未变化；复用此前独立验证，当前候选相关前端和原生测试通过。
+      truncated: false
+  - id: A5
+    source: brief.md
+    text: A5：上方用 Ant Design Segmented
+      常显两种比对内容及三个同步方式，比对与预览相邻。一个预览动作生成并原位展示真实计划，返回保留差异阅读状态，包含目标、范围和增改删摘要；保留结构选中对象/整表对齐、数据补齐/合并/完全对齐。数据默认补齐不变，合并更新同键差异，完全对齐涉及删除时额外确认；零变更不可执行。
+    result: passed
+    reason:
+      text: 顶部模式和策略、真实计划生成、原位预览返回及零变更和删除确认逻辑未变化，复用此前独立通过证据和当前候选检查。
+      truncated: false
+  - id: A6
+    source: brief.md
+    text: A6：执行前保留一次目标与变更摘要确认；执行中上下文锁定、停止入口可达、关闭预览不取消任务；执行后显示成功/失败/部分完成/待核实及重新比对入口，不自动执行下一张表或另一种同步模式。
+    result: passed
+    reason:
+      text: 确认、上下文锁定、全局停止、隐藏预览保持任务及完成状态逻辑未变化；当前候选生命周期测试通过，复用此前独立验收。
+      truncated: false
+  - id: A7
+    source: brief.md
+    text: A7：在1920×1080桌面窗口中，来源目标、当前表及主操作可达，差异表内部滚动，无页面级横向溢出；选表入口可达，长库表名可查看完整值，键盘标签与焦点可用。
+    result: passed
+    reason:
+      text: 本轮删除侧栏备用输入，保留现有侧栏、搜索标签、表名 title 和全部顶部控件；无新增布局约束。复用上一轮1920×1080独立 DOM
+        和截图证据，本轮 CUA 记录确认顶部控件保持。
+      truncated: false
+  - id: A8
+    source: brief.md
+    text: A8：主题、密度、连接管理、执行记录、复制/导出及既有失效、精确值、冲突与提交边界保持；既有相关测试及前端构建通过，模拟交互证据与未运行的真实数据库验证分开记录。
+    result: passed
+    reason:
+      text: 独立读取当前候选 Runtime 状态及绑定日志：前端34/34、原生7/7、两端构建和 diff-check
+        均通过。主题、密度、连接管理、记录、复制导出和执行边界未变；模拟验证与真实数据库未验证已分别记录。
+      truncated: false
+builder_handoff:
+  candidate_id: 9fe6e7a6-421a-4307-be0b-09b71aa03fa5
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:eab32158-3d30-4085-ac3f-30eed8301281
+  iteration: 1
+  summary:
+    text: 删除来源手动表名输入及相关说明，仅保留搜索和清单选择；未载入提示载入，空结果显示未找到表。用户明确拒绝将手动指定合并进搜索。其他逻辑未改。
+    truncated: false
+  addressed_acceptance_ids:
+    - A1
+    - A2
+    - A3
+    - A4
+    - A5
+    - A6
+    - A7
+    - A8
+  checks:
+    - name:
+        text: frontend-tests
+        truncated: false
+      result: passed
+      note:
+        text: 34/34
+        truncated: false
+    - name:
+        text: frontend-build
+        truncated: false
+      result: passed
+      note:
+        text: tsc + vite
+        truncated: false
+    - name:
+        text: browser-empty-search
+        truncated: false
+      result: passed
+      note:
+        text: CUA主动载入后搜索not_a_table显示未找到表，无手动或使用此表名入口
+        truncated: false
+  checks_truncated: false
+  known_limits:
+    - text: 模拟UI；真实DB与Windows未验证
+      truncated: false
+  known_limits_truncated: false
+  review: null
+  submitted_at: 2026-09-22T05:40:49.648Z
+blockers: []
+verification:
+  candidate_id: 9fe6e7a6-421a-4307-be0b-09b71aa03fa5
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:1aec01fe-3faf-4c97-8265-22258014d1da
+  iteration: 1
+  attempt: 1
+  assurance: skill-coordinated
+  verdict: pass
+  checks:
+    - id: frontend-tests
+      name:
+        text: 前端测试
+        truncated: false
+      argv_display:
+        - text: test
+          truncated: false
+      argv_truncated: false
+      cwd_ref: frontend
+      status: passed
+      exit_code: 0
+      duration_ms: 669
+    - id: frontend-build
+      name:
+        text: 前端构建
+        truncated: false
+      argv_display:
+        - text: run
+          truncated: false
+        - text: build
+          truncated: false
+      argv_truncated: false
+      cwd_ref: frontend
+      status: passed
+      exit_code: 0
+      duration_ms: 2362
+    - id: native-build
+      name:
+        text: 原生构建
+        truncated: false
+      argv_display:
+        - text: --build
+          truncated: false
+        - text: build
+          truncated: false
+        - text: --parallel
+          truncated: false
+        - text: "4"
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 8040
+    - id: native-tests
+      name:
+        text: 原生测试
+        truncated: false
+      argv_display:
+        - text: --test-dir
+          truncated: false
+        - text: build
+          truncated: false
+        - text: --output-on-failure
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 24184
+    - id: diff-check
+      name:
+        text: 差异空白检查
+        truncated: false
+      argv_display:
+        - text: diff
+          truncated: false
+        - text: --check
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 22
+  summary:
+    text: A1–A8通过，无新增阻塞发现。已核对当前完整验收、brief/spec、来源选表实现、模拟交互证据及候选绑定检查；未修改文件、未推进
+      Runtime、未重复运行测试。
+    truncated: false
+  risks:
+    - text: 本轮独立核查聚焦来源手动输入删除和空结果逻辑；浏览器交互采用已提供的本轮 CUA 证据，未重复未变化范围的既有独立审查。
+      truncated: false
+    - text: 界面验证使用隔离模拟桥接；真实数据库连接、同步及 Windows 打包应用未验证。
+      truncated: false
+    - text: 前端构建仍有既有大于500KB分包警告。
+      truncated: false
+  risks_truncated: false
+  completed_at: 2026-09-22T05:43:49.190Z
+history:
+  - goal_cycle: 1
+    iteration: 0
+    attempt: 0
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Native confirmed acceptance criteria changed
+      truncated: false
+    completed_at: 2026-09-22T04:34:52.064Z
+  - goal_cycle: 2
+    iteration: 1
+    attempt: 1
+    outcome: fail
+    unresolved_ids:
+      - A6
+    summary:
+      text: 独立审查A1–A8：7项通过，A6因跨模式/页面隐藏停止失败；结合当前源码、Runtime绑定检查和隔离浏览器补测。
+      truncated: false
+    completed_at: 2026-09-22T04:53:24.429Z
+  - goal_cycle: 2
+    iteration: 2
+    attempt: 1
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: A1–A8全部通过；复用未变化范围的首轮证据，独立核验当前候选检查并重点复测A6修复及1920×1080页脚布局。未发现新增阻塞问题；未修改文件或推进Runtime。
+      truncated: false
+    completed_at: 2026-09-22T05:05:22.997Z
+  - goal_cycle: 2
+    iteration: 2
+    attempt: 1
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: 用户指出实现偏离任务01a0c71e-0000-7f12-9565-7d8af227e7e3最后确认原型；旧规格未同步末轮设计。纠正为左侧搜索扁平Tree、上方Segmented连续操作、行内详情与原位预览，保留1920×1080及真实执行保护。
+      truncated: false
+    completed_at: 2026-09-22T05:11:21.990Z
+  - goal_cycle: 3
+    iteration: 0
+    attempt: 0
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Native confirmed acceptance criteria changed
+      truncated: false
+    completed_at: 2026-09-22T05:14:24.532Z
+  - goal_cycle: 4
+    iteration: 1
+    attempt: 1
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: A1–A8 通过。核对完整当前验收、brief/spec、最终
+        prototype.tsx、当前实现及候选绑定检查日志，独立补测数据比对、行下详情、原位预览返回和1920×1080布局；未发现新增阻塞问题。未修改文件或推进
+        Runtime。
+      truncated: false
+    completed_at: 2026-09-22T05:27:03.577Z
+  - goal_cycle: 4
+    iteration: 1
+    attempt: 1
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: 用户要求顶部结合原布局，常显两端各自连接测试；在已确认共享顶部与可选测试范围内修正实现，手动表名入口保留并澄清用途。
+      truncated: false
+    completed_at: 2026-09-22T05:31:58.908Z
+  - goal_cycle: 4
+    iteration: 2
+    attempt: 0
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Native Shape artifacts changed
+      truncated: false
+    completed_at: 2026-09-22T05:33:52.991Z
+  - goal_cycle: 5
+    iteration: 1
+    attempt: 1
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: A1–A8 通过，无新增阻塞发现。已独立核对当前 brief/spec、源码 diff、新增行为测试及 Runtime
+        绑定检查，并补查顶部与备用输入实际界面。未编辑文件、未提交结果或推进 Runtime。
+      truncated: false
+    completed_at: 2026-09-22T05:38:36.490Z
+  - goal_cycle: 5
+    iteration: 1
+    attempt: 1
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: 用户明确要求删除来源手动表名入口，仅从已载入清单搜索选择；空搜索结果只显示未找到，不提供使用输入名称的替代入口。
+      truncated: false
+    completed_at: 2026-09-22T05:39:43.416Z
+  - goal_cycle: 6
+    iteration: 1
+    attempt: 1
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: A1–A8通过，无新增阻塞发现。已核对当前完整验收、brief/spec、来源选表实现、模拟交互证据及候选绑定检查；未修改文件、未推进
+        Runtime、未重复运行测试。
+      truncated: false
+    completed_at: 2026-09-22T05:43:49.190Z
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pass
+verification_report: verification.md
+archived: true
+created_at: 2026-09-22T03:19:32.368Z
