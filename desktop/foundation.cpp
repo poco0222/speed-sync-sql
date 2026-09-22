@@ -225,6 +225,17 @@ QJsonObject Foundation::execute(const QString &operation, const QJsonObject &arg
         next[side] = id;
         if (!persist(next, error)) return failure(error, "storage");
         invalidateSchema();
+    } else if (operation == "swap-endpoints") {
+        if (busy() || syncExecuting) return failure("任务进行中，请等待结束后对换", "busy");
+        if (find(state["left"].toString()).isEmpty() || find(state["right"].toString()).isEmpty()) return failure("请先选择来源与目标连接", "validation");
+        auto workspaces = state["workspaces"].toObject();
+        const auto current = workspaces[workspaceKey()].toObject();
+        auto swapped = current; swapped["left"] = current["right"]; swapped["right"] = current["left"];
+        next["left"] = state["right"]; next["right"] = state["left"];
+        workspaces[next["left"].toString() + ":" + next["right"].toString()] = swapped;
+        next["workspaces"] = workspaces;
+        if (!persist(next, error)) return failure(error, "storage");
+        invalidateSchema();
     } else if (operation == "cancel-schema") {
         invalidateSchema();
         return success({{"cancelled", true}});

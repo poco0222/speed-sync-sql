@@ -10,6 +10,32 @@ class FoundationTest : public QObject {
     Q_OBJECT
     QJsonObject connection() { return {{"name", "本地测试"}, {"host", "127.0.0.1"}, {"port", 3306}, {"user", "test"}, {"password", "test-secret-NEVER-PERSIST"}, {"database", ""}, {"tls", "preferred"}, {"ca", ""}, {"remember", false}, {"timeout", QJsonValue::Null}}; }
 private slots:
+    void swapEndpointsKeepsCurrentMappingAndIsAtomic() {
+        QTemporaryDir dir; Foundation service(dir.path());
+        QCOMPARE(service.execute("swap-endpoints", {})["code"].toString(), QString("validation"));
+        const QJsonValue a = service.execute("save", connection())["id"], b = service.execute("save", connection())["id"];
+        QVERIFY(service.execute("select", {{"side", "left"}, {"id", b}})["ok"].toBool());
+        QVERIFY(service.execute("select", {{"side", "right"}, {"id", a}})["ok"].toBool());
+        QJsonObject original{{"left", QJsonObject{{"database", "source"}, {"table", "orders"}}}, {"right", QJsonObject{{"database", "target"}, {"table", "archive"}}}, {"width", 240}};
+        auto historic = original; historic["left"] = QJsonObject{{"database", "obsolete"}, {"table", "old"}};
+        QVERIFY(service.execute("workspace", historic)["ok"].toBool());
+        QVERIFY(service.execute("select", {{"side", "left"}, {"id", a}})["ok"].toBool());
+        QVERIFY(service.execute("select", {{"side", "right"}, {"id", b}})["ok"].toBool());
+        QVERIFY(service.execute("workspace", original)["ok"].toBool());
+        auto swapped = original; swapped["left"] = original["right"]; swapped["right"] = original["left"];
+        const auto result = service.execute("swap-endpoints", {});
+        QVERIFY(result["ok"].toBool());
+        QCOMPARE(result["state"].toObject()["left"], b); QCOMPARE(result["state"].toObject()["right"], a);
+        QCOMPARE(result["state"].toObject()["workspace"].toObject(), swapped);
+        Foundation restarted(dir.path()); QCOMPARE(restarted.snapshot()["workspace"].toObject(), swapped);
+        QVERIFY(service.execute("swap-endpoints", {})["ok"].toBool());
+        QCOMPARE(service.snapshot()["workspace"].toObject(), original);
+        const auto before = service.snapshot();
+        QVERIFY(QFile::remove(dir.filePath("connections.json")));
+        QVERIFY(QDir().mkdir(dir.filePath("connections.json")));
+        QCOMPARE(service.execute("swap-endpoints", {})["code"].toString(), QString("storage"));
+        QCOMPARE(service.snapshot(), before);
+    }
     void recentWorkspaceIsLocalAndScoped() {
         QTemporaryDir dir; Foundation service(dir.path());
         QJsonValue a = service.execute("save", connection())["id"];

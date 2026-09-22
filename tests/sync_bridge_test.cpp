@@ -35,6 +35,12 @@ class SyncBridgeTest : public QObject {
     }
     QJsonObject record(Foundation &service) { return service.execute("sync-status", {})["record"].toObject(); }
 private slots:
+    void swapInvalidatesPlan() {
+        QTemporaryDir dir; Foundation s(dir.path()); setup(s); auto p = plan(s); QVERIFY(p["ok"].toBool());
+        QVERIFY(s.execute("swap-endpoints", {})["ok"].toBool());
+        QCOMPARE(s.execute("execute-sync", {{"planId", p["plan"].toObject()["id"]}})["code"].toString(), QString("stale"));
+        QCOMPARE(s.execute("copy-schema", {{"side", "left"}})["code"].toString(), QString("stale"));
+    }
     void staleAndDuplicateProtection() {
         QTemporaryDir dir; Foundation s(dir.path()); setup(s); auto p = plan(s); QVERIFY(p["ok"].toBool());
         QJsonValue id = p["plan"].toObject()["id"];
@@ -45,6 +51,7 @@ private slots:
         QCOMPARE(s.execute("execute-sync", {{"planId", id}})["code"].toString(), QString("busy"));
         QCOMPARE(s.execute("select", {{"side", "left"}, {"id", ""}})["code"].toString(), QString("busy"));
         QCOMPARE(s.execute("cancel-schema", {})["code"].toString(), QString("busy"));
+        QCOMPARE(s.execute("swap-endpoints", {})["code"].toString(), QString("busy"));
         QTRY_VERIFY_WITH_TIMEOUT(!s.busy(), 5000);
         QCOMPARE(record(s)["status"].toString(), QString("passed"));
         QCOMPARE(record(s)["verification"].toObject()["status"].toString(), QString("same"));

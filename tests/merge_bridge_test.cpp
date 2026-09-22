@@ -38,6 +38,11 @@ class MergeBridgeTest : public QObject {
     QJsonObject record(Foundation &service){return service.execute("merge-status",{})["record"].toObject();}
     QJsonObject execute(Foundation &service,const QJsonObject &p){return service.execute("merge-execute",{{"planId",p["plan"].toObject()["id"]},{"confirmed",true}});}
 private slots:
+    void swapInvalidatesPlan() {
+        QTemporaryDir dir; Foundation s(dir.path()); setup(s); auto p=plan(s); QVERIFY(p["ok"].toBool());
+        QVERIFY(s.execute("swap-endpoints", {})["ok"].toBool());
+        QCOMPARE(execute(s,p)["code"].toString(),QString("stale"));
+    }
     void deleteConfirmation() {
         QTemporaryDir dir;Foundation s(dir.path());setup(s);auto p=plan(s,"align");QVERIFY(p["ok"].toBool());
         const QJsonValue id=p["plan"].toObject()["id"];
@@ -71,7 +76,7 @@ private slots:
     }
     void nativeContextLocked() {
         QTemporaryDir dir;Foundation s(dir.path());setup(s);auto p=plan(s);QVERIFY(p["ok"].toBool());QVERIFY(execute(s,p)["ok"].toBool());
-        for(const auto &operation:QStringList{"select","settings","cancel-schema","data-invalidate","merge-invalidate"})
+        for(const auto &operation:QStringList{"select","settings","cancel-schema","data-invalidate","merge-invalidate","swap-endpoints"})
             QCOMPARE(s.execute(operation,{})["code"].toString(),QString("busy"));
         QCOMPARE(send(s,"plan-sync",{{"direction","left-to-right"},{"alignAll",true}})["code"].toString(),QString("busy"));
         s.execute("merge-stop",{});QTRY_VERIFY_WITH_TIMEOUT(!s.busy(),5000);

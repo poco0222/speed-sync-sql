@@ -7,21 +7,22 @@ import * as schema from '../src/schema.ts';
 import * as sync from '../src/sync.ts';
 import {Freshness} from '../src/freshness.ts';
 
-test('mode switches retain the data element identity while data writes lock sibling contexts without self-locking',()=>{
- const slots=[],effects=[],writeStates=[];let cursor=0,tree;
+test('mode switches retain the data element identity while data writes lock sibling contexts without self-locking',async()=>{
+ const slots=[],effects=[],writeStates=[],requests=[];
+ const comparison={complete:true,status:'different',left:{},right:{},rows:['left-only','different','right-only'].map((status,i)=>({category:'columns',name:String(i),status,changed:[],left:{properties:{}},right:{properties:{}}}))};let cursor=0,tree;
  const hooks={forwardRef:f=>f,useState:initial=>{const i=cursor++;if(!(i in slots))slots[i]=typeof initial==='function'?initial():initial;return[slots[i],value=>{slots[i]=typeof value==='function'?value(slots[i]):value;}];},useRef:initial=>{const i=cursor++;return slots[i]??={current:initial};},useEffect:(fn,deps)=>{const i=cursor++,old=slots[i];if(!old||!deps||deps.some((d,j)=>d!==old.deps[j])){slots[i]={deps,cleanup:old?.cleanup};effects.push(()=>{slots[i].cleanup?.();slots[i].cleanup=fn();});}},useImperativeHandle:(ref,fn)=>{ref.current=fn();}};
- const antd=Object.fromEntries(['Alert','AutoComplete','Button','Checkbox','Empty','Slider','Space','Table','Tabs','Tag'].map(name=>[name,name]));
+ const antd=Object.fromEntries(['Alert','AutoComplete','Button','Checkbox','Empty','Drawer','Space','Table','Tabs','Tag','Tree','Segmented'].map(name=>[name,name]));
  antd.Input={Search:'Search'};antd.Typography={Title:'Title',Text:'Text',Paragraph:'Paragraph'};antd.message={useMessage:()=>[{success(){},error(){}},null]};
  const jsx=(type,props,key)=>({type,props,key});const module={exports:{}};
  const code=ts.transpileModule(fs.readFileSync(new URL('../src/SchemaWorkbench.tsx',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
- vm.runInNewContext(code,{exports:module.exports,require:name=>({'react':hooks,'antd':antd,'./schema':schema,'./sync':sync,'./freshness':{Freshness},'./bridge':{request:async()=>({ok:true})},'./SyncPanel':{SyncPanel:'SyncPanel'},'./DataWorkbench':{DataWorkbench:'DataWorkbench'},'react/jsx-runtime':{jsx,jsxs:jsx,Fragment:'Fragment'}}[name]),window:{matchMedia:()=>({matches:false})},setInterval:()=>1,clearInterval(){}});
+ vm.runInNewContext(code,{exports:module.exports,require:name=>({'react':hooks,'antd':antd,'./schema':schema,'./sync':sync,'./freshness':{Freshness},'./bridge':{request:async(operation,args)=>{requests.push({operation,args});return {ok:true,...(operation==='compare'?{comparison}:operation==='schema'?{items:[{name:'one'},{name:'two'}]}:{})};}},'./SyncPanel':{SyncPanel:'SyncPanel'},'./DataWorkbench':{DataWorkbench:'DataWorkbench'},'react/jsx-runtime':{jsx,jsxs:jsx,Fragment:'Fragment'}}[name]),window:{matchMedia:()=>({matches:false})},setInterval:()=>1,clearInterval(){}});
  const ref={},state={left:'left',right:'right',connections:[{id:'left',name:'Left'},{id:'right',name:'Right'}],workspace:{left:{database:'a',table:'t'},right:{database:'b',table:'t'}}};
  const render=()=>{cursor=0;tree=module.exports.SchemaWorkbench({state,disabled:false,onRunning(){},onDataRunning(){},onDataWriteRunning:value=>writeStates.push(value)},ref);while(effects.length)effects.shift()();};
- const nodes=type=>{const found=[];const walk=(n,path=[])=>{if(!n||typeof n!=='object')return;if(Array.isArray(n)){n.forEach((child,i)=>walk(child,[...path,i]));return;}if(n.type===type)found.push({...n,path:path.join('/')});walk(n.props?.children,[...path,'children']);};walk(tree);return found;};
- const mode=()=>nodes('Tabs').find(n=>n.props.className==='workbench-tabs');
+ const nodes=type=>{const found=[];const walk=(n,path=[])=>{if(!n||typeof n!=='object')return;if(Array.isArray(n)){n.forEach((child,i)=>walk(child,[...path,i]));return;}if(n.type===type)found.push({...n,path:path.join('/')});walk(n.props?.children,[...path,'children']);walk(n.props?.action,[...path,'action']);walk(n.props?.modeControl,[...path,'modeControl']);};walk(tree);return found;};
+ const mode=()=>nodes('Segmented').find(n=>n.props['aria-label']==='比对内容');
  const data=()=>{assert.equal(nodes('DataWorkbench').length,1);return nodes('DataWorkbench')[0];};
  const start=()=>nodes('Button').find(n=>n.props.children==='开始比对');
- render();assert.equal(nodes('DataWorkbench').length,0);
+ render();assert.equal(nodes('DataWorkbench').length,1);assert.equal(mode().props.value,'data');
  mode().props.onChange('data');render();const identity={key:data().key,path:data().path};
  const stable=()=>{assert.deepEqual({key:data().key,path:data().path},identity);assert.equal(data().props.disabled,false);};
  stable();assert.equal(start().props.disabled,false);
@@ -34,4 +35,12 @@ test('mode switches retain the data element identity while data writes lock sibl
  data().props.onMergeRunning(false);render();stable();
  assert.equal(start().props.disabled,false);assert.equal(nodes('SyncPanel')[0].props.disabled,false);
  assert.ok(nodes('AutoComplete').every(n=>!n.props.disabled));assert.deepEqual(writeStates,[true,false]);
+ nodes('Button').find(n=>n.props.children==='载入 / 刷新表').props.onClick();await new Promise(resolve=>setImmediate(resolve));render();
+ assert.deepEqual(Array.from(nodes('Tree')[0].props.treeData,n=>n.key),['one','two']);assert.ok(nodes('Tree')[0].props.treeData.every(n=>n.isLeaf&&!n.children));
+ start().props.onClick();await new Promise(resolve=>setImmediate(resolve));render();
+ assert.deepEqual(Array.from(nodes('SyncPanel')[0].props.selected),['columns:0']);
+ nodes('SyncPanel')[0].props.onStrategyChange('merge');render();assert.deepEqual(Array.from(nodes('SyncPanel')[0].props.selected),['columns:0','columns:1']);
+ nodes('SyncPanel')[0].props.onStrategyChange('align');render();assert.equal(nodes('SyncPanel')[0].props.strategy,'align');assert.ok(nodes('Table')[0].props.rowSelection.getCheckboxProps(comparison.rows[0]).disabled);
+ nodes('Table')[0].props.expandable.onExpand(true,comparison.rows[0]);render();assert.deepEqual(Array.from(nodes('Table')[0].props.expandable.expandedRowKeys),['columns:0']);assert.equal(nodes('aside').length,1);
+ nodes('Tree')[0].props.onSelect(['two']);render();assert.equal(nodes('SyncPanel')[0].props.comparison,undefined);assert.equal(requests.at(-1).operation,'workspace');assert.equal(requests.at(-1).args.right.table,'two');
 });

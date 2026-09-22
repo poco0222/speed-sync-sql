@@ -44,6 +44,9 @@ private slots:
         send("catalog", "schema", {{"side", "left"}, {"action", "databases"}});
         send("duplicate", "schema", {{"side", "left"}, {"action", "databases"}});
         QCOMPARE(response(spy, "duplicate")["code"].toString(), QString("busy"));
+        const auto pendingState = service.snapshot();
+        QCOMPARE(service.execute("swap-endpoints", {})["code"].toString(), QString("busy"));
+        QCOMPARE(service.snapshot(), pendingState);
         QVERIFY(service.execute("cancel-schema", {})["ok"].toBool());
         send("replacement", "schema", {{"side", "left"}, {"action", "databases"}});
         QTRY_VERIFY_WITH_TIMEOUT(!service.busy(), 3000);
@@ -100,6 +103,7 @@ private slots:
         int ticks = 0; QTimer timer; connect(&timer, &QTimer::timeout, [&] { ++ticks; }); timer.start(10);
         start(service, "left1", "left", left); start(service, "left2", "left", left); start(service, "right1", "right", right);
         QVERIFY(service.busy()); QVERIFY(!response(spy, "left2")["ok"].toBool());
+        QCOMPARE(service.execute("swap-endpoints", {})["code"].toString(), QString("busy"));
         QTRY_VERIFY_WITH_TIMEOUT(!service.busy(), 3000);
         QVERIFY(response(spy, "left1")["ok"].toBool()); QVERIFY(response(spy, "right1")["ok"].toBool());
         QVERIFY(ticks >= 10);
