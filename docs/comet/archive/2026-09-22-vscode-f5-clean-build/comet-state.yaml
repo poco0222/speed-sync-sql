@@ -1,0 +1,143 @@
+schema: comet.native.v4
+name: vscode-f5-clean-build
+language: zh-CN
+phase: archive
+status: done
+state_version: 8
+brief: brief.md
+shape_confirmation_hash: c8957218624bfd5b90f225e09e1601210f9556361dd5da847565dd053ba60b25
+spec_changes:
+  - capability: vscode-debug
+    operation: modify
+    source: specs/vscode-debug/spec.md
+workspace:
+  isolation: current
+  change_branch: main
+  target_branch: main
+  finish: null
+loop:
+  stage: done
+  goal_cycle: 1
+  iteration: 1
+  attempt: 1
+  retry_epoch: 0
+  failed_iteration_count: 0
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: null
+acceptance:
+  - id: A1
+    source: brief.md
+    text: A1：在源码未改变时连续执行两次 F5 对应构建任务，两次均清理原生目标并重新编译项目
+      C++、重建资源及链接应用，前端构建每次执行；不因产物哈希相同跳过这些步骤。
+    result: passed
+    reason:
+      text: 独立核对 .vscode/launch.json 的 preLaunchTask、tasks.json 与
+        scripts/build-macos.sh:16，实际 F5 任务无条件执行 npm ci、前端构建及 cmake --build build
+        --clean-first --parallel 4。复用 Runtime 绑定的 unchanged-full-builds
+        成功证据，并读取检查脚本及两轮原始日志：源码哈希不变，两轮各清理 38 文件、执行 48 构建步骤，重新编译项目 C++ 和
+        qrc_ui.cpp 并链接应用。
+      truncated: false
+  - id: A2
+    source: brief.md
+    text: A2：构建或测试失败时仍中止启动；现有原生及前端测试通过，README 明确强制重建及时间成本。
+    result: passed
+    reason:
+      text: 脚本保留 set -eu，构建、CTest 和前端测试均为直接执行命令；.vscode/settings.json 保留
+        debug.onTaskErrors=abort。Runtime 已实测缺失插件时预启动任务非零退出。两轮日志分别记录 7 项原生测试全部通过及
+        26 项前端测试零失败。README.md:28 明确每次强制重建、源码哈希不变也不跳过编译链接及完整编译测试的等待成本。
+      truncated: false
+builder_handoff:
+  candidate_id: 1bd113a5-03bd-4dfa-8cf7-99850c554b08
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:5835315d-bf74-4040-ade6-7f3b17366b49
+  iteration: 1
+  summary:
+    text: scripts/build-macos.sh 增加 --clean-first；README 说明每次 F5/直接执行脚本强制重建及耗时。
+    truncated: false
+  addressed_acceptance_ids:
+    - A1
+    - A2
+  checks:
+    - name:
+        text: shell syntax and diff whitespace
+        truncated: false
+      result: passed
+      note:
+        text: zsh -n 与 git diff --check 通过
+        truncated: false
+    - name:
+        text: two unchanged-source full builds
+        truncated: false
+      result: not-run
+      note:
+        text: 交由 Runtime 运行 /tmp/speed_sync_clean_check.py，避免重复构建；从实际 F5
+          配置解析任务并连续执行两次、验证源码哈希未变和重建日志。
+        truncated: false
+  checks_truncated: false
+  known_limits:
+    - text: 尚未在 VS Code GUI 实际按 F5；直接执行配置定义的同一任务。
+      truncated: false
+  known_limits_truncated: false
+  review: null
+  submitted_at: 2026-09-22T03:08:21.867Z
+blockers: []
+verification:
+  candidate_id: 1bd113a5-03bd-4dfa-8cf7-99850c554b08
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:a6bd065e-20e0-41d5-81d4-2db77652d07c
+  iteration: 1
+  attempt: 1
+  assurance: skill-coordinated
+  verdict: pass
+  checks:
+    - id: unchanged-full-builds
+      name:
+        text: Two unchanged-source full builds and failure handling
+        truncated: false
+      argv_display:
+        - text: /tmp/speed_sync_clean_check.py
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 89666
+  summary:
+    text: 只读审查当前两文件 diff、正式需求、实际调试配置及 Runtime 绑定证据；A1/A2 通过，无可操作缺陷。CodeGraph
+      无有效脚本匹配后按规则回退读取；未修改文件、索引或状态，未重复构建，未重审既有断点行为。
+    truncated: false
+  risks:
+    - text: VS Code GUI 中实际按 F5 未实测；验证执行配置定义的同一预启动任务，失败后的 GUI
+        启动阻断依据现有配置与脚本语义，未注入真实编译或测试失败。
+      truncated: false
+    - text: 全量重建限于项目 CMake 管理的产物和前端资源，不重编第三方 Qt/MySQL，也不生成发行安装包。
+      truncated: false
+  risks_truncated: false
+  completed_at: 2026-09-22T03:11:32.805Z
+history:
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 1
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: 只读审查当前两文件 diff、正式需求、实际调试配置及 Runtime 绑定证据；A1/A2 通过，无可操作缺陷。CodeGraph
+        无有效脚本匹配后按规则回退读取；未修改文件、索引或状态，未重复构建，未重审既有断点行为。
+      truncated: false
+    completed_at: 2026-09-22T03:11:32.805Z
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pass
+verification_report: verification.md
+archived: true
+created_at: 2026-09-22T03:05:09.969Z
