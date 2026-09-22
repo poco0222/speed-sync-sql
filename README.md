@@ -25,7 +25,7 @@ open build/speed-sync-sql.app
 
 用 VS Code 打开仓库根目录，安装并启用 Microsoft **C/C++** 扩展（`ms-vscode.cpptools`）。完成上述 Qt、Node 和 QMYSQL 准备后，在 C++ 源码中设置断点，按 **F5** 选择 **Speed Sync SQL (macOS)**；使用 LLDB 调试原生主进程。**Shift+F5** 停止调试。
 
-预启动任务复用 `scripts/build-macos.sh`：安装锁定的前端依赖、构建前端、配置及编译 Debug 程序，并运行现有测试。每次 F5 都执行该流程；构建或测试失败时中止启动，不运行旧程序。任务通过登录 zsh 获取 Node 等工具路径，支持脚本原有的 `SPEED_SYNC_QT_ROOT`、`SPEED_SYNC_QT_TOOLS` 和 `SPEED_SYNC_MYSQL_PLUGIN` 环境变量。
+预启动任务复用 `scripts/build-macos.sh`：安装锁定的前端依赖、构建前端、配置 Debug，并通过 `cmake --build build --clean-first` 清理后重新编译全部项目原生目标与资源、链接应用，再运行现有测试。每次 F5 都强制重建，即使源码和资源哈希完全相同也不跳过编译或链接；直接运行该脚本同样全量重建，因此每次启动需要等待完整编译和测试。清理仅涉及 CMake 管理的构建产物，不删除应用数据，也不重编第三方 Qt/MySQL 库。构建或测试失败时中止启动，不运行旧程序。任务通过登录 zsh 获取 Node 等工具路径，支持脚本原有的 `SPEED_SYNC_QT_ROOT`、`SPEED_SYNC_QT_TOOLS` 和 `SPEED_SYNC_MYSQL_PLUGIN` 环境变量。
 
 调试沿用正常应用数据目录，不自动连接数据库。此配置仅支持当前 macOS arm64 环境的 C++ 主进程；React/TypeScript 断点和数据库工作子进程不会自动附加，Windows 调试需另行配置。
 

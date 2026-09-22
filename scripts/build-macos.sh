@@ -13,6 +13,6 @@ npm --prefix frontend run build
   -DCMAKE_PREFIX_PATH="$qt_root" -DCMAKE_OSX_ARCHITECTURES=arm64 \
   -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 -DCMAKE_BUILD_TYPE=Debug \
   -DSPEED_SYNC_MYSQL_PLUGIN="$plugin"
-"$cmake_bin" --build build --parallel 4
+"$cmake_bin" --build build --clean-first --parallel 4
 "$qt_tools/CMake/CMake.app/Contents/bin/ctest" --test-dir build --output-on-failure
 npm --prefix frontend test
