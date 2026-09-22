@@ -32,6 +32,15 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Local design exploration and standalone prototypes
+# Keep formal docs/comet, docs/development and top-level design documents tracked.
+/docs/discovery/
+/docs/design/layout-alternatives/
+/docs/design/single-table-sync/
+/docs/design/ux-review-*/
+/frontend/prototype.html
+/frontend/src/prototype.tsx
+
 # Python probe cache
 __pycache__/
 *.py[cod]
