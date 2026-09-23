@@ -1,0 +1,250 @@
+schema: comet.native.v4
+name: button-icons
+language: zh-CN
+phase: archive
+status: done
+state_version: 11
+brief: brief.md
+document_constraints_version: 1
+shape_confirmation_hash: 813fa8bff626d1747ce97633756628ed7617dc4339551447d647ff22b463379a
+spec_changes:
+  - capability: button-icons
+    operation: create
+    source: specs/button-icons/spec.md
+workspace:
+  isolation: current
+  change_branch: main
+  target_branch: main
+  finish: null
+loop:
+  stage: done
+  goal_cycle: 2
+  iteration: 1
+  attempt: 1
+  retry_epoch: 0
+  failed_iteration_count: 0
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: null
+acceptance:
+  - id: A1
+    source: brief.md
+    text: "Scenario: A1
+      工作台结构模式按钮图标：在比对工作台表结构模式下，开始/重新比对、取消读取、载入库清单、载入/刷新表（来源与目标）、选择数据库、修改映射、应用映射\
+      、预览同步、查看同步详情、返回差异、重新比对、执行到目标、复制完整 SQL、导出 SQL、导出 JSON
+      摘要、清空选择、复制完整定义/对象完整定义按钮均显示语义对应的 Ant Design 图标，按钮文案与行为不变。"
+    result: passed
+    reason:
+      text: SchemaWorkbench.tsx 与 SyncPanel.tsx
+        逐按钮核对：开始/重新比对=Search/RedoOutlined(153)、取消读取=Close(153)、载入库清单=Reload(136)、载入/刷新表来源与目标=Reload(139/147)、选择数据库=Database(131)、修改映射=Edit(141)、应用映射=Check(144)、清空选择=Clear(161)、复制完整定义/对象完整定义=Copy(121/126)、导出
+        JSON
+        摘要=Export(154)、预览同步=Eye(SyncPanel:84)、查看同步详情=Profile(84)、请求停止=Stop(82)、返回差异=ArrowLeft(91)、重新比对=Redo(91)、执行到目标=PlayCircle(94)、复制完整
+        SQL=Copy(94)、导出 SQL=Export(94)，与 spec 语义映射逐条一致；两个源文件剥除 icon 属性与 icons
+        import 后与 HEAD 逐字节相同，文案与行为属性零改动。
+      truncated: false
+  - id: A2
+    source: brief.md
+    text: "Scenario: A2
+      工作台数据模式按钮图标：在表数据模式下，开始数据比对、开始独立浏览、停止扫描、编辑比对条件、条件抽屉内取消/应用条件/添加 AND
+      条件/删除条件、完整键定位、清除定位、关闭详情、加载完整值、复制完整原文/HEX、预览同步、请求边界停止、按当前上下文重新比对、查看执行结果、执行\
+      数据写入按钮均显示语义对应的图标，文案与行为不变。"
+    result: passed
+    reason:
+      text: DataWorkbench.tsx 与 DataMergePanel.tsx
+        逐按钮核对：开始数据比对=Search、开始独立浏览=Eye、停止扫描=Stop、编辑比对条件=Edit(DataWorkbench:66)、条件抽屉取消=Close/应用条件=Check(73)、删除条件=Delete(78)、添加
+        AND
+        条件=Plus(79)、完整键定位=Aim/清除定位=CloseCircle(82)、关闭详情=Close/加载完整值=Export/复制完整原文与
+        HEX=Copy(84)、预览同步=Eye、请求边界停止=Stop(63/72)、按当前上下文重新比对=Redo(63/72)、查看执行结果=Profile(63)、返回差异=ArrowLeft(65)、执行数据写入=PlayCircle(71)，与
+        spec 映射一致；等价性校验证明无任何行为改动。
+      truncated: false
+  - id: A3
+    source: brief.md
+    text: "Scenario: A3
+      全局框架与连接管理按钮图标：顶部与连接管理页的测试连接、编辑/新建、设置、对换、导出诊断、新建连接、添加第一个连接、用作左侧/右侧、复制、删除、停\
+      止当前任务、连接抽屉内取消/测试连接/保存连接按钮均显示语义对应的图标，文案与行为不变。"
+    result: passed
+    reason:
+      text: main.tsx 逐按钮核对：测试连接=Api(139/165)、编辑/新建=条件
+        Edit/Plus(139)、设置=Setting(145)、对换=Swap(151)、导出诊断=Export(155)、新建连接=Plus(155)、添加第一个连接=Plus(156)、用作左侧/右侧=Left/Right(160)、复制=Copy(160)、删除=Delete(160)、停止当前任务=Stop(164)、连接抽屉取消=Close/测试连接=Api/保存连接=Save(165)，全部与
+        spec 一致；连接名称 name-button(157) 按 D4 排除规则不加图标。
+      truncated: false
+  - id: A4
+    source: brief.md
+    text: "Scenario: A4 执行记录按钮图标：执行记录页的刷新记录、查看记录、回到工作台重新比对、导出记录 JSON
+      按钮均显示语义对应的图标，文案与行为不变。"
+    result: passed
+    reason:
+      text: SyncRecords.tsx：刷新记录=Reload(20)、查看记录=Eye(24)、回到工作台重新比对=Redo(25)、导出记录
+        JSON=Export(25)；查看记录 spec 未显式归类，EyeOutlined 与『查看』语义对应且不违反任何映射条目；剥除图标后与
+        HEAD 一致，行为不变。
+      truncated: false
+  - id: A5
+    source: brief.md
+    text: "Scenario: A5 构建与测试回归：`frontend` 全部现有测试通过，`npm run build`（tsc --noEmit +
+      vite build）通过；图标仅通过 Button 的 icon 属性注入，不改变按钮文本内容，测试的按文本匹配按钮断言不需要改写语义。"
+    result: passed
+    reason:
+      text: "@ant-design/icons 6.3.4 已加入 frontend/package.json 直接依赖并同步 lockfile；五个测试文件
+        diff 仅新增 @ant-design/icons Proxy 组件桩（各 1-3 行，无断言改动），测试仍以 props.children
+        文本匹配按钮、icon 为独立属性故断言语义不变；Runtime frontend-tests(exit 0)与
+        frontend-build(exit 0)绑定 candidateId fb67e38d 且 isolation=current
+        工作区即候选实现（git status 与移交文件清单完全吻合）；机械等价校验证明图标仅经 Button icon 属性注入、无文本内嵌图标。"
+      truncated: false
+builder_handoff:
+  candidate_id: fb67e38d-31b7-446f-b947-7f11372bbc93
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:867ed010-ba52-496f-b29c-768654eaed5d
+  iteration: 1
+  summary:
+    text: 为六个前端组件（main、SchemaWorkbench、SyncPanel、DataWorkbench、DataMergePanel、SyncRecords）的全部交互
+      Button 注入 @ant-design/icons outlined 图标（icon 属性，文本不变）：A1
+      结构模式（载入/刷新、比对、预览、执行、复制/导出、清空选择等）；A2
+      数据模式（开始比对/独立浏览、停止扫描、条件抽屉取消/应用/添加/删除、定位、详情加载/复制、预览、边界停止、重新比对、执行写入）；A3
+      全局与连接管理（测试连接、编辑/新建、设置、对换、导出诊断、新建连接、行内用作左侧/右侧/复制/删除、停止当前任务、抽屉取消/保存）；A4
+      执行记录（刷新、查看、回到工作台、导出 JSON）。连接名/对象名 name-button 文字链接按约定不加。@ant-design/icons
+      6.3.4 加入 frontend 直接依赖并同步
+      lockfile；五个测试文件（application/schema-workbench/data-workbench/sync-panel/merge）补
+      @ant-design/icons Proxy 组件桩。开发期检查：npm test 34/34 通过；npm run build（tsc
+      --noEmit + vite build）通过，保留既有 chunk>500kB 提示；rg 扫描确认除两个 name-button 外无缺图标
+      Button。已知限制：图标语义选择为设计判断，未经真人浏览器逐条目检。
+    truncated: false
+  addressed_acceptance_ids:
+    - A1
+    - A2
+    - A3
+    - A4
+    - A5
+  checks:
+    - name:
+        text: 前端回归 npm test
+        truncated: false
+      result: passed
+      note:
+        text: 34/34 通过，含图标桩后全部组件测试
+        truncated: false
+    - name:
+        text: 前端构建 npm run build
+        truncated: false
+      result: passed
+      note:
+        text: tsc --noEmit 与 vite build 成功；chunk>500kB 为既有提示
+        truncated: false
+    - name:
+        text: 按钮覆盖扫描
+        truncated: false
+      result: passed
+      note:
+        text: 六个源文件中除 2 个 name-button 内容标识链接外，全部 Button 均有 icon 属性
+        truncated: false
+  checks_truncated: false
+  known_limits:
+    - text: 图标语义与视觉密度未做真人浏览器逐条人工核对，可经 tests/workbench.html 模拟页复核
+      truncated: false
+  known_limits_truncated: false
+  review: null
+  submitted_at: 2026-09-23T06:42:49.163Z
+blockers: []
+verification:
+  candidate_id: fb67e38d-31b7-446f-b947-7f11372bbc93
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:1cd52d82-ee7a-4a4e-98e6-811ab7c1e3ea
+  iteration: 1
+  attempt: 1
+  assurance: skill-coordinated
+  verdict: pass
+  checks:
+    - id: frontend-tests
+      name:
+        text: 前端回归测试
+        truncated: false
+      argv_display:
+        - text: --prefix
+          truncated: false
+        - text: frontend
+          truncated: false
+        - text: test
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 666
+    - id: frontend-build
+      name:
+        text: 前端类型检查与构建
+        truncated: false
+      argv_display:
+        - text: --prefix
+          truncated: false
+        - text: frontend
+          truncated: false
+        - text: run
+          truncated: false
+        - text: build
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 1896
+  summary:
+    text: 独立核对六个组件共 62 个 Button：60 个交互按钮全部经 icon 属性注入语义对应的 @ant-design/icons 6.3.4
+      outlined 图标（含编辑/新建、开始/重新比对两处条件图标），2 个 name-button（连接名称 main.tsx:157、对象名称
+      SchemaWorkbench.tsx:163）按 spec 排除规则不加图标；剥除 icon 属性与 icons import 后六个源文件与
+      HEAD 逐字节一致，证明文案、onClick、disabled/loading/danger/type
+      零改动；停止/重新比对/返回差异/执行/预览/复制/导出等同类动作跨页面图标一致；测试桩与依赖声明正确，Runtime
+      测试与构建记录绑定当前候选且通过。A1-A5 全部通过。
+    truncated: false
+  risks:
+    - text: 『查看记录』(SyncRecords.tsx:24) 使用 EyeOutlined，而 spec 将同类详情动作『查看同步详情/查看执行结果』归为
+        ProfileOutlined；spec 未显式映射查看记录，属可辩护的设计判断，建议后续人工目检时评估是否统一为
+        ProfileOutlined。
+      truncated: false
+    - text: 图标视觉渲染（浅深主题、标准/紧凑密度、1920×1080 无横向溢出）与逐条语义观感未经真人浏览器核对（Builder 已声明），可经
+        tests/workbench.html 模拟页复核；本验收为代码级核对。
+      truncated: false
+    - text: Runtime 两条检查记录（test 666ms / build 1896ms，均 exit
+        0）由任务包转述，无法从仓库状态独立复演其执行时间；已核对检查命令目标文件与当前候选工作区内容一致、comet-state.yaml
+        candidateId 吻合，判定绑定可信。
+      truncated: false
+  risks_truncated: false
+  completed_at: 2026-09-23T06:49:08.623Z
+history:
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 0
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Formal requirement write requested for specs/button-icons/spec.md
+      truncated: false
+    completed_at: 2026-09-23T06:40:16.091Z
+  - goal_cycle: 2
+    iteration: 1
+    attempt: 1
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: 独立核对六个组件共 62 个 Button：60 个交互按钮全部经 icon 属性注入语义对应的 @ant-design/icons 6.3.4
+        outlined 图标（含编辑/新建、开始/重新比对两处条件图标），2 个 name-button（连接名称 main.tsx:157、对象名称
+        SchemaWorkbench.tsx:163）按 spec 排除规则不加图标；剥除 icon 属性与 icons import 后六个源文件与
+        HEAD 逐字节一致，证明文案、onClick、disabled/loading/danger/type
+        零改动；停止/重新比对/返回差异/执行/预览/复制/导出等同类动作跨页面图标一致；测试桩与依赖声明正确，Runtime
+        测试与构建记录绑定当前候选且通过。A1-A5 全部通过。
+      truncated: false
+    completed_at: 2026-09-23T06:49:08.623Z
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pass
+verification_report: verification.md
+archived: true
+created_at: 2026-09-23T06:28:57.657Z
