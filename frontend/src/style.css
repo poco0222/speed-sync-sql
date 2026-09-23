@@ -12,13 +12,15 @@ button, input { font: inherit; }
 .topbar .ant-menu { flex: 1; min-width: 250px; border-bottom: 0; background: transparent; line-height: 63px; }
 main { flex: 1; display: flex; flex-direction: column; }
 .banner { margin: 16px 24px 0; }
-.connection-bar { background: var(--surface); border-bottom: 1px solid var(--line); display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; padding: 14px 24px; gap: 24px; }
+.connection-bar { background: var(--surface); border-bottom: 1px solid var(--line); display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: start; padding: 10px 24px; gap: 16px 24px; }
 .connection-divider { background: var(--line); }
-.endpoint { min-width: 0; }
+.endpoint { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .eyebrow { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 1px; margin-bottom: 10px; }
-.endpoint-controls { display: flex; gap: 8px; }
-.endpoint-controls .ant-select { flex: 1; min-width: 100px; }
-.endpoint-detail { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; font-size: 12px; min-height: 20px; overflow-wrap: anywhere; }
+.endpoint-label { font-size: 13px; font-weight: 600; white-space: nowrap; }
+.endpoint-controls { display: flex; align-items: center; gap: 8px; }
+.endpoint-controls .ant-select { flex: 1; min-width: 140px; }
+.endpoint-detail { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 12px; min-height: 18px; overflow-wrap: anywhere; }
+.endpoint-detail .test-result time { flex-basis: auto; }
 .mono { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px; overflow-wrap: anywhere; }
 .test-result { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; font-size: 12px; overflow-wrap: anywhere; }
 .test-result time { display: block; flex-basis: 100%; color: var(--muted); font-size: 11px; }
@@ -45,8 +47,8 @@ footer { min-height: 33px; border-top: 1px solid var(--line); display: flex; pad
 .drawer-footer { display: flex; justify-content: space-between; padding: 7px 0; }
 .editor-status { margin-top: 20px; }
 .ant-table-cell { overflow-wrap: anywhere; }
-@media (max-width: 1050px) { .topbar { gap: 20px; padding: 0 20px; } .connection-bar { gap: 18px; padding: 14px 20px; } .workbench-empty { margin: 20px; } }
-@media (max-width: 750px) { .topbar { height: auto; flex-wrap: wrap; gap: 8px; padding: 12px; } .topbar .ant-menu { order: 3; flex-basis: 100%; line-height: 40px; } .topbar > button { margin-left: auto; } .connection-bar { grid-template-columns: 1fr; } .connection-divider { height: 1px; } .page-heading { align-items: flex-start; flex-direction: column; } .workspace-caption { flex-wrap: wrap; gap: 8px; } .empty-center { padding: 35px 12px; } footer { flex-wrap: wrap; gap: 5px; } }
+@media (max-width: 1050px) { .topbar { gap: 20px; padding: 0 20px; } .connection-bar { gap: 16px 18px; padding: 10px 20px; } .workbench-empty { margin: 20px; } }
+@media (max-width: 750px) { .topbar { height: auto; flex-wrap: wrap; gap: 8px; padding: 12px; } .topbar .ant-menu { order: 3; flex-basis: 100%; line-height: 40px; } .topbar > button { margin-left: auto; } .connection-bar { grid-template-columns: 1fr; } .connection-bar > .ant-btn { justify-self: center; } .connection-divider { height: 1px; } .page-heading { align-items: flex-start; flex-direction: column; } .workspace-caption { flex-wrap: wrap; gap: 8px; } .empty-center { padding: 35px 12px; } footer { flex-wrap: wrap; gap: 5px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 .schema-workbench { padding: 0 24px 24px; background: var(--surface); min-width: 0; }
 .schema-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding: 16px; border-bottom: 1px solid var(--line); }
@@ -143,5 +145,4 @@ main { min-height: 0; overflow: auto; padding-bottom: 33px; background: var(--su
 .ant-drawer .endpoint-controls { flex-wrap: wrap; }
 .ant-drawer .endpoint-controls .ant-select { min-width: 240px; }
 
-.schema-workbench > .connection-bar { padding: 16px 0; }
-.schema-workbench > .connection-bar .ant-typography { margin-top: 0; }
+.schema-workbench > .connection-bar { padding: 10px 0; }
