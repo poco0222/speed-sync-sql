@@ -43,7 +43,7 @@ test('closing preview preserves polling, write lock and the visible stop action'
  components.Modal={useModal:()=>[{},null]};
  const request=async(op,args)=>{calls.push({op,args});return {ok:true,running:active};};
  const code=ts.transpileModule(readFileSync(new URL('../src/DataMergePanel.tsx',import.meta.url),'utf8'),{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
- runInNewContext(code,{exports,require:name=>({'react':hooks,'react/jsx-runtime':{jsx,jsxs:jsx},antd:components,'./bridge':{request},'./sync':{syncLabels},'./merge':mergeRules})[name],setTimeout:fn=>{timers.push(fn);return timers.length;},clearTimeout:()=>{}});
+ runInNewContext(code,{exports,require:name=>({'react':hooks,'react/jsx-runtime':{jsx,jsxs:jsx},antd:components,'@ant-design/icons':new Proxy({},{get:(_,name)=>name}),'./bridge':{request},'./sync':{syncLabels},'./merge':mergeRules})[name],setTimeout:fn=>{timers.push(fn);return timers.length;},clearTimeout:()=>{}});
  const retained=jsx('RetainedResults',{page:2,expanded:['one']});
  const render=()=>{cursor=0;const tree=exports.DataMergePanel({children:retained,modeControl:jsx('ModeControl',{}),mode:'fill',onModeChange:()=>{},target:'b.t',scope:'全表',task:{complete:true,state:'complete',counts:{same:0,different:1,leftOnly:0,rightOnly:0}},taskId:'scan',browse:false,disabled:false,onRunning:value=>locks.push(value),onRecompare:()=>{}});while(effects.length)effects.shift()();return tree;};
  const settle=()=>new Promise(resolve=>setImmediate(resolve));

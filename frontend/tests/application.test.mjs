@@ -13,6 +13,7 @@ function application() {
     useEffect(fn, deps) { const i = cursor++, old = slots[i]; if (!old || deps.some((d, j) => d !== old[j])) { slots[i] = deps; effects.push(fn); } }
   };
   const antd = Object.fromEntries(['Alert', 'Button', 'Checkbox', 'Collapse', 'ConfigProvider', 'Drawer', 'Empty', 'InputNumber', 'Layout', 'Menu', 'Select', 'Space', 'Table', 'Tag'].map(name => [name, name]));
+  const icons = new Proxy({}, { get: (_, name) => name });
   antd.Form = Object.assign(() => {}, { Item: 'Form.Item', useForm: () => [{}] });
   antd.Input = Object.assign(() => {}, { Password: 'Input.Password' });
   antd.Modal = Object.assign(() => {}, { useModal: () => [{ confirm() {} }, null] });
@@ -23,7 +24,7 @@ function application() {
   const runtime = { reply: async () => ({ ok: true, running: true }) };
   const jsx = (type, props) => ({ type, props });
   const dependencies = {
-    react: hooks, antd, 'antd/locale/zh_CN': {}, 'react/jsx-runtime': { jsx, jsxs: jsx },
+    react: hooks, antd, '@ant-design/icons': icons, 'antd/locale/zh_CN': {}, 'react/jsx-runtime': { jsx, jsxs: jsx },
     'react-dom/client': { createRoot: () => ({ render: element => { Component = element.type; } }) },
     './SchemaWorkbench': { SchemaWorkbench: 'SchemaWorkbench' }, './SyncRecords': { SyncRecords: 'SyncRecords' },
     './freshness': { Freshness: class { invalidate() { return 1; } current() { return true; } } }, './style.css': {},

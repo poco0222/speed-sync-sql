@@ -1,8 +1,3 @@
-# >>> Comet managed project state >>>
-!/.comet/
-/.comet/*
-!/.comet/config.yaml
-# <<< Comet managed project state <<<
 
 # Local data and tooling state
 /.local/
@@ -55,3 +50,8 @@ Desktop.ini
 .vs/
 *.swp
 *.swo
+# >>> Comet managed project state >>>
+!/.comet/
+/.comet/*
+!/.comet/config.yaml
+# <<< Comet managed project state <<<
